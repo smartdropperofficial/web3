@@ -1,0 +1,10 @@
+### Inserimento dati nella tabella subscription
+POST http://localhost:4000/verify-subscription-payment
+Content-Type: application/json
+
+{
+  "wallet": "0x39AF390FC9FDef3e550475F12aF47D65B517FEcD",
+  "payment_tx": "0x9993bdbe5855813bd2a44a1a7d0c7ad835216441769d44e06733a9e7acb0c0b7",
+  "amount_paid": "7.78",
+  "status": "CONFIRMING"
+}
