@@ -1,59 +1,45 @@
-// import { supabase } from "../config/supabase";
-// import { Transaction } from "../types";
-// import { log } from "../utils/logger";
+import { supabase } from "../config/supabase";
 
-// // Salva una transazione in Supabase
-// export const saveTransaction = async (tx: Transaction) => {
-//   // Check if the transaction already exists
-//   const { data: existingTransaction, error: fetchError } = await supabase
-//     .from("transactions")
-//     .select("tx_hash")
-//     .eq("tx_hash", tx.tx_hash)
-//     .single();
+// ✅ Log transaction errors in Supabase
+export async function logTransactionError(txHash: string, result: string) {
+  console.log(`📝 Logging transaction ${txHash} error in Supabase...`);
 
-//   if (fetchError && fetchError.code !== "PGRST116") {
-//     // Ignore "No rows found" error
-//     log.error(
-//       `Errore nel controllo esistenza transazione: ${fetchError.message}`
-//     );
-//     return;
-//   }
+  const { error } = await supabase
+    .from("transactions")
+    .insert([{ tx_hash: txHash, result }]);
 
-//   // If the transaction already exists, skip inserting it
-//   if (existingTransaction) {
-//     log.info(`⚠️ Transazione già presente in Supabase: ${tx.tx_hash}`);
-//     return;
-//   }
+  if (error) {
+    console.error(`❌ Error logging transaction ${txHash}:`, error);
+  } else {
+    console.log(`✅ Transaction ${txHash} error logged successfully.`);
+  }
+}
 
-//   // Insert only if it's not a duplicate
-//   const { error } = await supabase.from("transactions").insert([tx]);
+// ✅ Update table status (Generic function for different tables)
+export async function updateTableStatus(
+  txHash: string,
+  table: string,
+  statusColumn: string,
+  newStatus: string,
+  identifierColumn: string
+) {
+  console.log(
+    `🔄 Attempting to update ${table}.${statusColumn} for ${txHash}...`
+  );
 
-//   if (error) {
-//     log.error(`❌ Errore nel salvataggio su Supabase: ${error.message}`);
-//   } else {
-//     log.success(`✅ Transazione salvata su Supabase: ${tx.tx_hash}`);
-//   }
-// };
+  const { error } = await supabase
+    .from(table)
+    .update({ [statusColumn]: newStatus })
+    .eq(identifierColumn, txHash);
 
-// // Recupera una transazione da Supabase
-// export const getTransaction = async (txHash: string) => {
-//   const { data, error } = await supabase
-//     .from("transactions")
-//     .select("*")
-//     .eq("tx_hash", txHash)
-//     .single();
-//   return { data, error };
-// };
-
-// // Pulisce le transazioni più vecchie di 10 minuti
-// export const cleanOldTransactions = async () => {
-//   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-//   const { error } = await supabase
-//     .from("transactions")
-//     .delete()
-//     .lt("timestamp", tenMinutesAgo);
-
-//   if (!error) {
-//     log.info("Transazioni vecchie eliminate da Supabase!");
-//   }
-// };
+  if (error) {
+    console.error(
+      `❌ Error updating ${table}.${statusColumn} for ${txHash}:`,
+      error
+    );
+  } else {
+    console.log(
+      `✅ ${table}.${statusColumn} updated to "${newStatus}" in ${table}.`
+    );
+  }
+}
