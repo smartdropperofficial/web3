@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { monitorTransaction } from "../services/transactionVerifier";
+import { ensureToken } from "../services/tokenService";
 
 const router = Router();
 
-router.post("/verify-subscription-payment", (req, res) => {
+router.post("/verify-subscription-payment", ensureToken, (req, res) => {
   monitorTransaction(
     req.body.payment_tx,
     parseFloat(req.body.amount_paid),
@@ -14,15 +15,13 @@ router.post("/verify-subscription-payment", (req, res) => {
     "ENABLED",
     "payment_tx"
   );
-  res
-    .status(202)
-    .json({
-      success: true,
-      message: "Monitoring started for subscription payment.",
-    });
+  res.status(202).json({
+    success: true,
+    message: "Monitoring started for subscription payment.",
+  });
 });
 
-router.post("/verify-pre-order-payment", (req, res) => {
+router.post("/verify-pre-order-payment", ensureToken, (req, res) => {
   monitorTransaction(
     req.body.payment_tx,
     parseFloat(req.body.amount_paid),
@@ -33,15 +32,13 @@ router.post("/verify-pre-order-payment", (req, res) => {
     "AWATING_PAYMENT",
     "payment_tx"
   );
-  res
-    .status(202)
-    .json({
-      success: true,
-      message: "Monitoring started for pre-order payment.",
-    });
+  res.status(202).json({
+    success: true,
+    message: "Monitoring started for pre-order payment.",
+  });
 });
 
-router.post("/verify-order-confirmation-payment", (req, res) => {
+router.post("/verify-order-confirmation-payment", ensureToken, (req, res) => {
   monitorTransaction(
     req.body.payment_tx,
     parseFloat(req.body.amount_paid),
@@ -52,12 +49,10 @@ router.post("/verify-order-confirmation-payment", (req, res) => {
     "ORDER_CONFIRMED",
     "payment_tx"
   );
-  res
-    .status(202)
-    .json({
-      success: true,
-      message: "Monitoring started for order confirmation payment.",
-    });
+  res.status(202).json({
+    success: true,
+    message: "Monitoring started for order confirmation payment.",
+  });
 });
 
 export default router;

@@ -61,3 +61,8 @@ Thumbs.db
 docker-compose.override.yml
 .dockerignore
 .vercel
+.vercel/
+api/*.js
+# Ignora i file compilati da TypeScript
+dist/
+src/api/*.js
