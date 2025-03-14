@@ -5,6 +5,7 @@ import {
 } from "../services/transactionVerifier";
 import {
   CreateSubcriptionOnChainParams,
+  OrderStatus,
   SubscriptionStatus,
 } from "../types/types";
 
@@ -19,16 +20,16 @@ router.post("/verify-subscription-payment", async (req, res) => {
     await monitorTransaction(
       req.body.payment_tx,
       parseFloat(req.body.amount_paid),
-      "tax_wallet",
+      "subscription_wallet",
       req.body.created_at,
       "subscription",
       "status",
-      "ENABLED",
+      SubscriptionStatus.ENABLED,
       "payment_tx"
     );
     return res.status(200).json({
       success: true,
-      message: "Transaction confirmed successfully!",
+      message: "Transaction monitored successfully!",
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -49,7 +50,7 @@ router.post("/create-subscription-onchain", async (req, res) => {
       await createOrderOnBlockchain(para);
       return res.status(200).json({
         success: true,
-        message: "Transaction confirmed successfully!",
+        message: "Transaction monitored successfully!",
       });
     }
   } catch (error: any) {
@@ -63,11 +64,11 @@ router.post("/verify-pre-order-payment", (req, res) => {
   monitorTransaction(
     req.body.payment_tx,
     parseFloat(req.body.amount_paid),
-    "tax_wallet",
+    "pre_order_wallet",
     req.body.created_at,
     "orders",
     "status",
-    "AWATING_PAYMENT",
+    OrderStatus.AWAITING_TAX,
     "payment_tx"
   );
   res.status(202).json({
@@ -84,7 +85,7 @@ router.post("/verify-order-confirmation-payment", (req, res) => {
     req.body.created_at,
     "orders",
     "status",
-    "ORDER_CONFIRMED",
+    OrderStatus.ORDER_CONFIRMED,
     "payment_tx"
   );
   res.status(202).json({

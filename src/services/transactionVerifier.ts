@@ -5,6 +5,7 @@ import { supabase } from "../config/supabase";
 import { initializeTaxWallet } from "../utils/web3";
 import subscriptionManagementABI from "../abi/subscriptionManagementABI.json";
 import { CreateSubcriptionOnChainParams } from "../types/types";
+import { getConfigField, getSupportedTokens } from "../utils/supabaseServices";
 
 const MAX_WAIT_TIME = 120000;
 const TOLERANCE = 0.01;
@@ -15,22 +16,11 @@ const ERC20_ABI = [
 const pendingTransactions: Record<string, boolean> = {};
 
 // Esempio di funzione asincrona (Supabase) per i token supportati
-async function getSupportedTokens(): Promise<Record<string, string>> {
-  const { data, error } = await supabase
-    .from("config")
-    .select("supported_tokens")
-    .single();
-  if (error) {
-    console.error("❌ Error fetching supported tokens:", error);
-    return {};
-  }
-  return data?.supported_tokens || {};
-}
 
 export async function monitorTransaction(
   txHash: string,
   expectedAmount: number,
-  destinationAddress: string,
+  destinationField: string, // e.g., "tax_wallet"
   createdAt: string,
   table: string,
   statusColumn: string,
@@ -39,133 +29,140 @@ export async function monitorTransaction(
 ): Promise<void> {
   console.log(`🔍 Starting transaction monitoring: ${txHash}`);
 
-  // Restituiamo subito una Promise così da bloccare l'await
-  return new Promise<void>(async (resolve, reject) => {
+  // Fetch supported tokens from Supabase
+  const SUPPORTED_TOKENS = await getSupportedTokens(); // if you already have this function in your project
+  console.log(`🔹 Loaded supported tokens:`, SUPPORTED_TOKENS);
+
+  // Retrieve destination address from config
+  let destinationAddress: string;
+  try {
+    destinationAddress = await getConfigField(destinationField);
+    console.log(
+      `🔹 Retrieved destination address from config (${destinationField}): ${destinationAddress}`
+    );
+  } catch (err) {
+    console.error("❌ Error retrieving destination address:", err);
+    await logTransactionError(
+      txHash,
+      "Error retrieving destination address from config."
+    );
+    throw err;
+  }
+
+  const timeout = setTimeout(() => {
+    console.log(`⏳ Timeout reached for transaction ${txHash}.`);
+    delete pendingTransactions[txHash];
+  }, MAX_WAIT_TIME);
+
+  provider.once("block", async (blockNumber) => {
     try {
-      // Carichiamo i token supportati
-      const SUPPORTED_TOKENS = await getSupportedTokens();
-      console.log(`🔹 Loaded supported tokens:`, SUPPORTED_TOKENS);
+      console.log(
+        `📡 New block mined: ${blockNumber}, checking transaction ${txHash}`
+      );
+      const receipt = await provider.getTransactionReceipt(txHash);
 
-      // Timeout manuale: se la transazione non arriva entro MAX_WAIT_TIME, facciamo reject
-      const timeout = setTimeout(() => {
-        console.log(`⏳ Timeout reached for transaction ${txHash}.`);
-        delete pendingTransactions[txHash];
-        reject(new Error(`Timeout reached for transaction ${txHash}`));
-      }, MAX_WAIT_TIME);
+      if (!receipt || !receipt.blockNumber) {
+        console.log(`❌ Transaction ${txHash} not confirmed.`);
+        await logTransactionError(txHash, "Transaction not confirmed.");
+        clearTimeout(timeout);
+        return;
+      }
 
-      // Registriamo l'ascolto per il nuovo blocco
-      provider.once("block", async (blockNumber) => {
+      clearTimeout(timeout);
+      console.log(
+        `✅ Transaction ${txHash} confirmed in block ${receipt.blockNumber}`
+      );
+
+      const block = await provider.getBlock(receipt.blockNumber);
+      if (!block || !block.timestamp) {
+        console.error(
+          `❌ Error retrieving timestamp for block ${receipt.blockNumber}`
+        );
+        await logTransactionError(txHash, "Error retrieving block timestamp.");
+        return;
+      }
+
+      const transactionTimestamp = block.timestamp * 1000;
+      const orderCreatedAt = new Date(createdAt).getTime();
+      const timeDifference = Math.abs(transactionTimestamp - orderCreatedAt);
+
+      console.log(
+        `⏳ Time difference between order and transaction: ${
+          timeDifference / 1000
+        } seconds`
+      );
+
+      if (timeDifference > TIME_DIFF_THRESHOLD) {
+        console.log(
+          `❌ Transaction ${txHash} is too old compared to the order timestamp.`
+        );
+        await logTransactionError(txHash, "Transaction too old.");
+        return;
+      }
+
+      let isValid = false;
+
+      for (const log of receipt.logs) {
         try {
-          console.log(
-            `📡 New block mined: ${blockNumber}, checking transaction ${txHash}`
-          );
-          const receipt = await provider.getTransactionReceipt(txHash);
+          const parsedLog = new Contract(
+            log.address,
+            ERC20_ABI,
+            provider
+          ).interface.parseLog(log);
+          if (!parsedLog || parsedLog.name !== "Transfer") continue;
 
-          if (!receipt || !receipt.blockNumber) {
-            console.log(`❌ Transaction ${txHash} not confirmed.`);
-            await logTransactionError(txHash, "Transaction not confirmed.");
-            clearTimeout(timeout);
-            return reject(new Error(`Transaction ${txHash} not confirmed.`));
-          }
-
-          clearTimeout(timeout);
-          console.log(
-            `✅ Transaction ${txHash} confirmed in block ${receipt.blockNumber}`
-          );
-
-          // Controlliamo il block timestamp
-          const block = await provider.getBlock(receipt.blockNumber);
-          if (!block || !block.timestamp) {
-            console.error(
-              `❌ Error retrieving timestamp for block ${receipt.blockNumber}`
-            );
-            await logTransactionError(
-              txHash,
-              "Error retrieving block timestamp."
-            );
-            return reject(new Error("Error retrieving block timestamp"));
-          }
-
-          const transactionTimestamp = block.timestamp * 1000;
-          const orderCreatedAt = new Date(createdAt).getTime();
-          const timeDifference = Math.abs(
-            transactionTimestamp - orderCreatedAt
-          );
+          const { to, value } = parsedLog.args;
+          const tokenAddress = log.address.toLowerCase();
+          const actualAmount = parseFloat(formatUnits(value, 6));
 
           console.log(
-            `⏳ Time difference between order and transaction: ${
-              timeDifference / 1000
-            } seconds`
+            `🔗 Token: ${tokenAddress}, Actual Amount: ${actualAmount}`
+          );
+          console.log(
+            `📥 Transaction destination: ${to.toLowerCase()}, Expected destination: ${destinationAddress.toLowerCase()}`
           );
 
-          if (timeDifference > TIME_DIFF_THRESHOLD) {
-            console.log(
-              `❌ Transaction ${txHash} is too old compared to the order timestamp.`
-            );
-            await logTransactionError(txHash, "Transaction too old.");
-            return reject(
-              new Error(
-                `Transaction ${txHash} too old compared to order timestamp`
-              )
-            );
-          }
-
-          // Analizziamo i log per validare il trasferimento
-          let isValid = false;
-
-          for (const log of receipt.logs) {
-            try {
-              const parsedLog = new Contract(
-                log.address,
-                ERC20_ABI,
-                provider
-              ).interface.parseLog(log);
-              if (!parsedLog || parsedLog.name !== "Transfer") continue;
-
-              const { to, value } = parsedLog.args;
-              const tokenAddress = log.address.toLowerCase();
-              const actualAmount = parseFloat(formatUnits(value, 6));
-
-              if (
-                SUPPORTED_TOKENS[tokenAddress] &&
-                to.toLowerCase() === destinationAddress.toLowerCase()
-              ) {
-                const difference = Math.abs(expectedAmount - actualAmount);
-                if (difference <= TOLERANCE) {
-                  console.log("✅ Amount is valid within tolerance!");
-                  isValid = true;
-                  break;
-                }
-              }
-            } catch (err) {
-              console.log("❌ Error analyzing a transaction log:", err);
-              continue;
+          if (
+            SUPPORTED_TOKENS[tokenAddress] &&
+            to.toLowerCase() === destinationAddress.toLowerCase()
+          ) {
+            const diff = Math.abs(expectedAmount - actualAmount);
+            if (diff <= TOLERANCE) {
+              console.log("✅ Amount is valid within tolerance!");
+              isValid = true;
+              break;
+            } else {
+              console.log(
+                "⚠️ Amount mismatch! Expected:",
+                expectedAmount,
+                "Actual:",
+                actualAmount,
+                "Difference:",
+                diff
+              );
             }
           }
-
-          if (isValid) {
-            pendingTransactions[txHash] = true;
-            await updateTableStatus(
-              txHash,
-              table,
-              statusColumn,
-              newStatus,
-              identifierColumn
-            );
-            resolve(); // Se tutto è ok, risolviamo
-          } else {
-            await logTransactionError(txHash, "Incorrect amount or recipient.");
-            reject(new Error("Incorrect amount or recipient."));
-          }
-        } catch (error) {
-          console.log(`❌ Error checking transaction ${txHash}:`, error);
-          await logTransactionError(txHash, "Error checking transaction.");
-          reject(error);
+        } catch (err) {
+          console.log("❌ Error analyzing a transaction log:", err);
+          continue;
         }
-      });
+      }
+
+      if (isValid) {
+        pendingTransactions[txHash] = true;
+        await updateTableStatus(
+          txHash,
+          table,
+          statusColumn,
+          newStatus,
+          identifierColumn
+        );
+      } else {
+        await logTransactionError(txHash, "Incorrect amount or recipient.");
+      }
     } catch (error) {
-      // Se c'è un errore fuori dal provider.once, lo gestiamo qui
-      reject(error);
+      console.log(`❌ Error checking transaction ${txHash}:`, error);
+      await logTransactionError(txHash, "Error checking transaction.");
     }
   });
 }
