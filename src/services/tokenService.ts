@@ -10,7 +10,6 @@ export const ensureToken = (
 
   // **Extract Authorization header**
   const bearerHeader = req.headers["authorization"];
-  console.log(`📡 Headers received: ${JSON.stringify(req.headers, null, 2)}`);
 
   // **Check if the Authorization header exists**
   if (!bearerHeader) {

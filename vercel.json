@@ -1,16 +1,16 @@
 {
-    "version": 2,
-    "builds": [
-      {
-        "src": "src/api/index.ts",
-        "use": "@vercel/node"
-      }
-    ],
-    "routes": [
-      {
-        "src": "/web3/(.*)",
-        "dest": "src/api/index.ts"
-      }
-    ]
-  }
-  
+  "version": 2,
+  "builds": [
+       {
+            "src": "dist/index.js",
+            "use": "@vercel/node",
+            "config": { "includeFiles": ["dist/**"], "maxDuration": 300000 }
+       }
+  ],
+  "routes": [
+       {
+            "src": "/(.*)",
+            "dest": "dist/index.js"
+       }
+  ]
+}

@@ -1,0 +1,96 @@
+import { Router } from "express";
+import {
+  createOrderOnBlockchain,
+  monitorTransaction,
+} from "../services/transactionVerifier";
+import {
+  CreateSubcriptionOnChainParams,
+  SubscriptionStatus,
+} from "../types/types";
+
+const router = Router();
+
+router.get("/hello", (req, res) => {
+  res.status(200).send("Hello, world!");
+});
+
+router.post("/verify-subscription-payment", async (req, res) => {
+  try {
+    await monitorTransaction(
+      req.body.payment_tx,
+      parseFloat(req.body.amount_paid),
+      "tax_wallet",
+      req.body.created_at,
+      "subscription",
+      "status",
+      "ENABLED",
+      "payment_tx"
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Transaction confirmed successfully!",
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+router.post("/create-subscription-onchain", async (req, res) => {
+  try {
+    const para = req.body as CreateSubcriptionOnChainParams;
+    if (para.status !== SubscriptionStatus.CONFIRMING) {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription is not in confirming state",
+      });
+    } else {
+      await createOrderOnBlockchain(para);
+      return res.status(200).json({
+        success: true,
+        message: "Transaction confirmed successfully!",
+      });
+    }
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+router.post("/verify-pre-order-payment", (req, res) => {
+  monitorTransaction(
+    req.body.payment_tx,
+    parseFloat(req.body.amount_paid),
+    "tax_wallet",
+    req.body.created_at,
+    "orders",
+    "status",
+    "AWATING_PAYMENT",
+    "payment_tx"
+  );
+  res.status(202).json({
+    success: true,
+    message: "Monitoring started for pre-order payment.",
+  });
+});
+
+router.post("/verify-order-confirmation-payment", (req, res) => {
+  monitorTransaction(
+    req.body.payment_tx,
+    parseFloat(req.body.amount_paid),
+    "tax_wallet",
+    req.body.created_at,
+    "orders",
+    "status",
+    "ORDER_CONFIRMED",
+    "payment_tx"
+  );
+  res.status(202).json({
+    success: true,
+    message: "Monitoring started for order confirmation payment.",
+  });
+});
+
+export default router;
