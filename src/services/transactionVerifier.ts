@@ -20,149 +20,93 @@ const pendingTransactions: Record<string, boolean> = {};
 export async function monitorTransaction(
   txHash: string,
   expectedAmount: number,
-  destinationField: string, // e.g., "tax_wallet"
+  destinationField: string,
   createdAt: string,
   table: string,
   statusColumn: string,
   newStatus: string,
   identifierColumn: string
 ): Promise<void> {
-  console.log(`🔍 Starting transaction monitoring: ${txHash}`);
+  console.log(`🔍 Avvio monitoraggio transazione: ${txHash}`);
 
-  // Fetch supported tokens from Supabase
-  const SUPPORTED_TOKENS = await getSupportedTokens(); // if you already have this function in your project
-  console.log(`🔹 Loaded supported tokens:`, SUPPORTED_TOKENS);
-
-  // Retrieve destination address from config
-  let destinationAddress: string;
-  try {
-    destinationAddress = await getConfigField(destinationField);
-    console.log(
-      `🔹 Retrieved destination address from config (${destinationField}): ${destinationAddress}`
-    );
-  } catch (err) {
-    console.error("❌ Error retrieving destination address:", err);
-    await logTransactionError(
-      txHash,
-      "Error retrieving destination address from config."
-    );
-    throw err;
-  }
-
-  const timeout = setTimeout(() => {
-    console.log(`⏳ Timeout reached for transaction ${txHash}.`);
-    delete pendingTransactions[txHash];
-  }, MAX_WAIT_TIME);
-
-  provider.once("block", async (blockNumber) => {
+  return new Promise<void>(async (resolve, reject) => {
     try {
-      console.log(
-        `📡 New block mined: ${blockNumber}, checking transaction ${txHash}`
-      );
-      const receipt = await provider.getTransactionReceipt(txHash);
-
-      if (!receipt || !receipt.blockNumber) {
-        console.log(`❌ Transaction ${txHash} not confirmed.`);
-        await logTransactionError(txHash, "Transaction not confirmed.");
-        clearTimeout(timeout);
-        return;
-      }
-
-      clearTimeout(timeout);
-      console.log(
-        `✅ Transaction ${txHash} confirmed in block ${receipt.blockNumber}`
-      );
-
-      const block = await provider.getBlock(receipt.blockNumber);
-      if (!block || !block.timestamp) {
-        console.error(
-          `❌ Error retrieving timestamp for block ${receipt.blockNumber}`
-        );
-        await logTransactionError(txHash, "Error retrieving block timestamp.");
-        return;
-      }
-
-      const transactionTimestamp = block.timestamp * 1000;
-      const orderCreatedAt = new Date(createdAt).getTime();
-      const timeDifference = Math.abs(transactionTimestamp - orderCreatedAt);
+      const SUPPORTED_TOKENS = await getSupportedTokens();
+      const destinationAddress = await getConfigField(destinationField);
 
       console.log(
-        `⏳ Time difference between order and transaction: ${
-          timeDifference / 1000
-        } seconds`
+        `🔹 Indirizzo di destinazione da config: ${destinationAddress}`
       );
 
-      if (timeDifference > TIME_DIFF_THRESHOLD) {
-        console.log(
-          `❌ Transaction ${txHash} is too old compared to the order timestamp.`
-        );
-        await logTransactionError(txHash, "Transaction too old.");
-        return;
-      }
+      const timeout = setTimeout(() => {
+        console.log(`⏳ Timeout raggiunto per la transazione ${txHash}.`);
+        delete pendingTransactions[txHash];
+        reject(new Error(`Timeout per la transazione ${txHash}`));
+      }, MAX_WAIT_TIME);
 
-      let isValid = false;
-
-      for (const log of receipt.logs) {
+      provider.once("block", async () => {
         try {
-          const parsedLog = new Contract(
-            log.address,
-            ERC20_ABI,
-            provider
-          ).interface.parseLog(log);
-          if (!parsedLog || parsedLog.name !== "Transfer") continue;
+          const receipt = await provider.getTransactionReceipt(txHash);
 
-          const { to, value } = parsedLog.args;
-          const tokenAddress = log.address.toLowerCase();
-          const actualAmount = parseFloat(formatUnits(value, 6));
+          if (!receipt || !receipt.blockNumber) {
+            await logTransactionError(txHash, "Transazione non confermata.");
+            clearTimeout(timeout);
+            return reject(new Error(`Transazione ${txHash} non confermata.`));
+          }
 
-          console.log(
-            `🔗 Token: ${tokenAddress}, Actual Amount: ${actualAmount}`
-          );
-          console.log(
-            `📥 Transaction destination: ${to.toLowerCase()}, Expected destination: ${destinationAddress.toLowerCase()}`
-          );
+          clearTimeout(timeout);
+          console.log(`✅ Transazione ${txHash} confermata`);
 
-          if (
-            SUPPORTED_TOKENS[tokenAddress] &&
-            to.toLowerCase() === destinationAddress.toLowerCase()
-          ) {
-            const diff = Math.abs(expectedAmount - actualAmount);
-            if (diff <= TOLERANCE) {
-              console.log("✅ Amount is valid within tolerance!");
-              isValid = true;
-              break;
-            } else {
-              console.log(
-                "⚠️ Amount mismatch! Expected:",
-                expectedAmount,
-                "Actual:",
-                actualAmount,
-                "Difference:",
-                diff
-              );
+          let isValid = false;
+
+          for (const log of receipt.logs) {
+            try {
+              const parsedLog = new Contract(
+                log.address,
+                ERC20_ABI,
+                provider
+              ).interface.parseLog(log);
+              if (!parsedLog || parsedLog.name !== "Transfer") continue;
+
+              const { to, value } = parsedLog.args;
+              const tokenAddress = log.address.toLowerCase();
+              const actualAmount = parseFloat(formatUnits(value, 6));
+
+              if (
+                SUPPORTED_TOKENS[tokenAddress] &&
+                to.toLowerCase() === destinationAddress.toLowerCase()
+              ) {
+                const difference = Math.abs(expectedAmount - actualAmount);
+                if (difference <= TOLERANCE) {
+                  isValid = true;
+                  break;
+                }
+              }
+            } catch (err) {
+              continue;
             }
           }
-        } catch (err) {
-          console.log("❌ Error analyzing a transaction log:", err);
-          continue;
-        }
-      }
 
-      if (isValid) {
-        pendingTransactions[txHash] = true;
-        await updateTableStatus(
-          txHash,
-          table,
-          statusColumn,
-          newStatus,
-          identifierColumn
-        );
-      } else {
-        await logTransactionError(txHash, "Incorrect amount or recipient.");
-      }
+          if (isValid) {
+            pendingTransactions[txHash] = true;
+            await updateTableStatus(
+              txHash,
+              table,
+              statusColumn,
+              newStatus,
+              identifierColumn
+            );
+            resolve();
+          } else {
+            await logTransactionError(txHash, "Importo o destinatario errato.");
+            reject(new Error("Importo o destinatario errato."));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
     } catch (error) {
-      console.log(`❌ Error checking transaction ${txHash}:`, error);
-      await logTransactionError(txHash, "Error checking transaction.");
+      reject(error);
     }
   });
 }

@@ -76,7 +76,6 @@ router.post("/verify-pre-order-payment", (req, res) => {
     message: "Monitoring started for pre-order payment.",
   });
 });
-
 router.post("/verify-order-confirmation-payment", (req, res) => {
   monitorTransaction(
     req.body.payment_tx,

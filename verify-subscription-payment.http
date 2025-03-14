@@ -1,7 +1,7 @@
 ### Inserimento dati nella tabella subscription
 #POST  https://api.smartdropper.io/web3/verify-subscription-payment
 # POST  http://localhost:4000/api/verify-subscription-payment
-POST  http://localhost:4000/api/verify-subscription-payment
+POST  https://api.smartdropper.io/api/verify-subscription-payment
 authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEyMywiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicm9sZSI6ImFkbWluIn0.JdBB91sQCX5cnczZn4hfm9ztKJijsUNMYsbC1PLEKhQ
 Content-Type: application/json
 
