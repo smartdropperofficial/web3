@@ -19,7 +19,7 @@ router.post("/verify-subscription-payment", async (req, res) => {
   try {
     await monitorTransaction(
       req.body.payment_tx,
-      parseFloat(req.body.amount_paid),
+      parseFloat(req.body.price),
       "subscription_wallet",
       req.body.created_at,
       "subscription",
@@ -32,6 +32,7 @@ router.post("/verify-subscription-payment", async (req, res) => {
       message: "Transaction monitored successfully!",
     });
   } catch (error: any) {
+    console.log("🚀 ~ router.post ~ error:", error);
     return res.status(400).json({
       success: false,
       message: error.message,
