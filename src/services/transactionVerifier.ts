@@ -21,93 +21,104 @@ export async function monitorTransaction(
   txHash: string,
   expectedAmount: number,
   destinationField: string,
-  createdAt: string, // Data di creazione dell'ordine
+  createdAt: string, // Order creation timestamp
   table: string,
   statusColumn: string,
   newStatus: string,
   identifierColumn: string
 ): Promise<void> {
-  console.log(`🔍 [MONITOR TRANSACTION] Inizio monitoraggio per TX: ${txHash}`);
-  console.log(`🔹 Importo atteso: ${expectedAmount}`);
-  console.log(`🔹 Campo di destinazione: ${destinationField}`);
+  console.log(`🔍 [MONITOR TRANSACTION] Starting monitoring for TX: ${txHash}`);
+  console.log(`🔹 Expected amount: ${expectedAmount}`);
+  console.log(`🔹 Destination field: ${destinationField}`);
 
   return new Promise<void>(async (resolve, reject) => {
     try {
       const SUPPORTED_TOKENS = await getSupportedTokens();
       const destinationAddress = await getConfigField(destinationField);
 
-      console.log(`🔹 Token supportati: ${JSON.stringify(SUPPORTED_TOKENS)}`);
+      console.log(`🔹 Supported tokens: ${JSON.stringify(SUPPORTED_TOKENS)}`);
+      console.log(`🔹 Destination address from config: ${destinationAddress}`);
+
+      console.log(`🕒 Raw createdAt from request: ${createdAt}`);
+      const createdAtUtc = new Date(createdAt).toISOString(); // Ensure UTC format
+      const orderCreatedAtMs = new Date(createdAtUtc).getTime(); // Convert to milliseconds
+
+      if (isNaN(orderCreatedAtMs)) {
+        console.error(
+          `❌ [ERROR] Invalid createdAt timestamp received: ${createdAt}`
+        );
+        await logTransactionError(txHash, "Invalid order creation timestamp.");
+        return reject(new Error("Invalid order creation timestamp"));
+      }
+
       console.log(
-        `🔹 Indirizzo di destinazione recuperato da config: ${destinationAddress}`
+        `🕒 Parsed order creation timestamp (UTC, ms): ${orderCreatedAtMs}`
       );
 
       const timeout = setTimeout(() => {
-        console.error(`⏳ [ERRORE] Timeout per la transazione ${txHash}.`);
+        console.error(`⏳ [ERROR] Timeout reached for transaction ${txHash}.`);
         delete pendingTransactions[txHash];
-        reject(new Error(`Timeout per la transazione ${txHash}`));
+        reject(new Error(`Timeout reached for transaction ${txHash}`));
       }, MAX_WAIT_TIME);
 
       provider.once("block", async () => {
         try {
-          console.log(`📡 [NEW BLOCK] Verifica transazione ${txHash}`);
+          console.log(`📡 [NEW BLOCK] Checking transaction ${txHash}`);
           const receipt = await provider.getTransactionReceipt(txHash);
 
           if (!receipt || !receipt.blockNumber) {
-            console.error(
-              `❌ [ERRORE] La transazione ${txHash} non è confermata.`
-            );
-            await logTransactionError(txHash, "Transazione non confermata.");
+            console.error(`❌ [ERROR] Transaction ${txHash} is not confirmed.`);
+            await logTransactionError(txHash, "Transaction not confirmed.");
             clearTimeout(timeout);
-            return reject(new Error(`Transazione ${txHash} non confermata.`));
+            return reject(new Error(`Transaction ${txHash} not confirmed.`));
           }
 
           clearTimeout(timeout);
           console.log(
-            `✅ [CONFIRMED] La transazione ${txHash} è stata confermata nel blocco ${receipt.blockNumber}`
+            `✅ [CONFIRMED] Transaction ${txHash} was confirmed in block ${receipt.blockNumber}`
           );
 
-          // **Recupero del timestamp della transazione dalla blockchain**
+          // **Retrieve transaction timestamp from blockchain**
           const block = await provider.getBlock(receipt.blockNumber);
           if (!block || !block.timestamp) {
             console.error(
-              `❌ Errore nel recupero del timestamp per il blocco ${receipt.blockNumber}`
+              `❌ Error retrieving timestamp for block ${receipt.blockNumber}`
             );
             await logTransactionError(
               txHash,
-              "Errore nel recupero del timestamp del blocco."
+              "Error retrieving block timestamp."
             );
-            return reject(
-              new Error("Errore nel recupero del timestamp del blocco")
-            );
+            return reject(new Error("Error retrieving block timestamp"));
           }
 
-          // **Convertiamo i timestamp per il confronto**
-          const transactionTimestamp = block.timestamp * 1000; // Converti in ms
-          const orderCreatedAt = new Date(createdAt).getTime();
+          const transactionTimestampMs = block.timestamp * 1000; // Convert block timestamp to milliseconds
+
+          console.log(
+            `📅 Block timestamp (converted to ms): ${transactionTimestampMs}`
+          );
+          console.log(`🕒 Order created timestamp (ms): ${orderCreatedAtMs}`);
+
           const timeDifference = Math.abs(
-            transactionTimestamp - orderCreatedAt
+            transactionTimestampMs - orderCreatedAtMs
           );
 
           console.log(
-            `⏳ Differenza di tempo tra ordine e transazione: ${
+            `⏳ Time difference between order and transaction: ${
               timeDifference / 1000
-            } secondi`
+            } seconds`
           );
           console.log(
-            `🕒 Soglia massima consentita: ${
+            `🕒 Maximum allowed threshold: ${
               TIME_DIFF_THRESHOLD / 1000
-            } secondi`
+            } seconds`
           );
 
-          // **Verifica se la transazione è troppo vecchia**
           if (timeDifference > TIME_DIFF_THRESHOLD) {
-            console.log(
-              `❌ [ERRORE] La transazione ${txHash} è TROPPO VECCHIA.`
-            );
-            await logTransactionError(txHash, "Transazione troppo vecchia.");
+            console.log(`❌ [ERROR] Transaction ${txHash} is TOO OLD.`);
+            await logTransactionError(txHash, "Transaction too old.");
             return reject(
               new Error(
-                `Transazione ${txHash} troppo vecchia rispetto alla data dell'ordine`
+                `Transaction ${txHash} is too old compared to the order timestamp`
               )
             );
           }
@@ -129,37 +140,37 @@ export async function monitorTransaction(
               const actualAmount = parseFloat(formatUnits(value, 6));
 
               console.log(`🔗 [LOG ANALYSIS] Token: ${tokenAddress}`);
-              console.log(`💰 Importo ricevuto: ${actualAmount}`);
-              console.log(`📥 Destinatario effettivo: ${to.toLowerCase()}`);
+              console.log(`💰 Received amount: ${actualAmount}`);
+              console.log(`📥 Actual recipient: ${to.toLowerCase()}`);
               console.log(
-                `📌 Indirizzo atteso: ${destinationAddress.toLowerCase()}`
+                `📌 Expected recipient: ${destinationAddress.toLowerCase()}`
               );
 
               if (!SUPPORTED_TOKENS[tokenAddress]) {
-                errorDetails = `Token ${tokenAddress} non supportato.`;
-                console.error(`❌ [ERRORE] ${errorDetails}`);
+                errorDetails = `Token ${tokenAddress} is not supported.`;
+                console.error(`❌ [ERROR] ${errorDetails}`);
                 continue;
               }
 
               if (to.toLowerCase() !== destinationAddress.toLowerCase()) {
-                errorDetails = `Indirizzo destinatario errato: atteso ${destinationAddress}, ricevuto ${to.toLowerCase()}.`;
-                console.error(`❌ [ERRORE] ${errorDetails}`);
+                errorDetails = `Incorrect recipient address: expected ${destinationAddress}, received ${to.toLowerCase()}.`;
+                console.error(`❌ [ERROR] ${errorDetails}`);
                 continue;
               }
 
               const difference = Math.abs(expectedAmount - actualAmount);
               if (difference > TOLERANCE) {
-                errorDetails = `Importo errato: atteso ${expectedAmount}, ricevuto ${actualAmount}. Differenza: ${difference}`;
-                console.error(`❌ [ERRORE] ${errorDetails}`);
+                errorDetails = `Incorrect amount: expected ${expectedAmount}, received ${actualAmount}. Difference: ${difference}`;
+                console.error(`❌ [ERROR] ${errorDetails}`);
                 continue;
               }
 
-              console.log("✅ [SUCCESS] Importo e destinatario corretti!");
+              console.log("✅ [SUCCESS] Amount and recipient are correct!");
               isValid = true;
               break;
             } catch (err) {
               console.error(
-                "❌ [ERRORE] Errore nell'analisi di un log di transazione:",
+                "❌ [ERROR] Error analyzing a transaction log:",
                 err
               );
               continue;
@@ -168,7 +179,7 @@ export async function monitorTransaction(
 
           if (isValid) {
             console.log(
-              `✅ [SUCCESS] Transazione ${txHash} verificata con successo!`
+              `✅ [SUCCESS] Transaction ${txHash} successfully verified!`
             );
             pendingTransactions[txHash] = true;
             await updateTableStatus(
@@ -181,14 +192,14 @@ export async function monitorTransaction(
             resolve();
           } else {
             console.error(
-              `📝 [LOGGING ERROR] Registrazione dell'errore per la transazione ${txHash}: ${errorDetails}`
+              `📝 [LOGGING ERROR] Recording the error for transaction ${txHash}: ${errorDetails}`
             );
             await logTransactionError(txHash, errorDetails);
             reject(new Error(errorDetails));
           }
         } catch (error) {
           console.error(
-            `❌ [ERRORE] Errore nel controllo della transazione ${txHash}:`,
+            `❌ [ERROR] Error checking transaction ${txHash}:`,
             error
           );
           reject(error);
