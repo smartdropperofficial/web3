@@ -21,43 +21,99 @@ export async function monitorTransaction(
   txHash: string,
   expectedAmount: number,
   destinationField: string,
-  createdAt: string,
+  createdAt: string, // Data di creazione dell'ordine
   table: string,
   statusColumn: string,
   newStatus: string,
   identifierColumn: string
 ): Promise<void> {
-  console.log(`🔍 Avvio monitoraggio transazione: ${txHash}`);
+  console.log(`🔍 [MONITOR TRANSACTION] Inizio monitoraggio per TX: ${txHash}`);
+  console.log(`🔹 Importo atteso: ${expectedAmount}`);
+  console.log(`🔹 Campo di destinazione: ${destinationField}`);
 
   return new Promise<void>(async (resolve, reject) => {
     try {
       const SUPPORTED_TOKENS = await getSupportedTokens();
       const destinationAddress = await getConfigField(destinationField);
 
+      console.log(`🔹 Token supportati: ${JSON.stringify(SUPPORTED_TOKENS)}`);
       console.log(
-        `🔹 Indirizzo di destinazione da config: ${destinationAddress}`
+        `🔹 Indirizzo di destinazione recuperato da config: ${destinationAddress}`
       );
 
       const timeout = setTimeout(() => {
-        console.log(`⏳ Timeout raggiunto per la transazione ${txHash}.`);
+        console.error(`⏳ [ERRORE] Timeout per la transazione ${txHash}.`);
         delete pendingTransactions[txHash];
         reject(new Error(`Timeout per la transazione ${txHash}`));
       }, MAX_WAIT_TIME);
 
       provider.once("block", async () => {
         try {
+          console.log(`📡 [NEW BLOCK] Verifica transazione ${txHash}`);
           const receipt = await provider.getTransactionReceipt(txHash);
 
           if (!receipt || !receipt.blockNumber) {
+            console.error(
+              `❌ [ERRORE] La transazione ${txHash} non è confermata.`
+            );
             await logTransactionError(txHash, "Transazione non confermata.");
             clearTimeout(timeout);
             return reject(new Error(`Transazione ${txHash} non confermata.`));
           }
 
           clearTimeout(timeout);
-          console.log(`✅ Transazione ${txHash} confermata`);
+          console.log(
+            `✅ [CONFIRMED] La transazione ${txHash} è stata confermata nel blocco ${receipt.blockNumber}`
+          );
+
+          // **Recupero del timestamp della transazione dalla blockchain**
+          const block = await provider.getBlock(receipt.blockNumber);
+          if (!block || !block.timestamp) {
+            console.error(
+              `❌ Errore nel recupero del timestamp per il blocco ${receipt.blockNumber}`
+            );
+            await logTransactionError(
+              txHash,
+              "Errore nel recupero del timestamp del blocco."
+            );
+            return reject(
+              new Error("Errore nel recupero del timestamp del blocco")
+            );
+          }
+
+          // **Convertiamo i timestamp per il confronto**
+          const transactionTimestamp = block.timestamp * 1000; // Converti in ms
+          const orderCreatedAt = new Date(createdAt).getTime();
+          const timeDifference = Math.abs(
+            transactionTimestamp - orderCreatedAt
+          );
+
+          console.log(
+            `⏳ Differenza di tempo tra ordine e transazione: ${
+              timeDifference / 1000
+            } secondi`
+          );
+          console.log(
+            `🕒 Soglia massima consentita: ${
+              TIME_DIFF_THRESHOLD / 1000
+            } secondi`
+          );
+
+          // **Verifica se la transazione è troppo vecchia**
+          if (timeDifference > TIME_DIFF_THRESHOLD) {
+            console.log(
+              `❌ [ERRORE] La transazione ${txHash} è TROPPO VECCHIA.`
+            );
+            await logTransactionError(txHash, "Transazione troppo vecchia.");
+            return reject(
+              new Error(
+                `Transazione ${txHash} troppo vecchia rispetto alla data dell'ordine`
+              )
+            );
+          }
 
           let isValid = false;
+          let errorDetails = "";
 
           for (const log of receipt.logs) {
             try {
@@ -72,22 +128,48 @@ export async function monitorTransaction(
               const tokenAddress = log.address.toLowerCase();
               const actualAmount = parseFloat(formatUnits(value, 6));
 
-              if (
-                SUPPORTED_TOKENS[tokenAddress] &&
-                to.toLowerCase() === destinationAddress.toLowerCase()
-              ) {
-                const difference = Math.abs(expectedAmount - actualAmount);
-                if (difference <= TOLERANCE) {
-                  isValid = true;
-                  break;
-                }
+              console.log(`🔗 [LOG ANALYSIS] Token: ${tokenAddress}`);
+              console.log(`💰 Importo ricevuto: ${actualAmount}`);
+              console.log(`📥 Destinatario effettivo: ${to.toLowerCase()}`);
+              console.log(
+                `📌 Indirizzo atteso: ${destinationAddress.toLowerCase()}`
+              );
+
+              if (!SUPPORTED_TOKENS[tokenAddress]) {
+                errorDetails = `Token ${tokenAddress} non supportato.`;
+                console.error(`❌ [ERRORE] ${errorDetails}`);
+                continue;
               }
+
+              if (to.toLowerCase() !== destinationAddress.toLowerCase()) {
+                errorDetails = `Indirizzo destinatario errato: atteso ${destinationAddress}, ricevuto ${to.toLowerCase()}.`;
+                console.error(`❌ [ERRORE] ${errorDetails}`);
+                continue;
+              }
+
+              const difference = Math.abs(expectedAmount - actualAmount);
+              if (difference > TOLERANCE) {
+                errorDetails = `Importo errato: atteso ${expectedAmount}, ricevuto ${actualAmount}. Differenza: ${difference}`;
+                console.error(`❌ [ERRORE] ${errorDetails}`);
+                continue;
+              }
+
+              console.log("✅ [SUCCESS] Importo e destinatario corretti!");
+              isValid = true;
+              break;
             } catch (err) {
+              console.error(
+                "❌ [ERRORE] Errore nell'analisi di un log di transazione:",
+                err
+              );
               continue;
             }
           }
 
           if (isValid) {
+            console.log(
+              `✅ [SUCCESS] Transazione ${txHash} verificata con successo!`
+            );
             pendingTransactions[txHash] = true;
             await updateTableStatus(
               txHash,
@@ -98,10 +180,17 @@ export async function monitorTransaction(
             );
             resolve();
           } else {
-            await logTransactionError(txHash, "Importo o destinatario errato.");
-            reject(new Error("Importo o destinatario errato."));
+            console.error(
+              `📝 [LOGGING ERROR] Registrazione dell'errore per la transazione ${txHash}: ${errorDetails}`
+            );
+            await logTransactionError(txHash, errorDetails);
+            reject(new Error(errorDetails));
           }
         } catch (error) {
+          console.error(
+            `❌ [ERRORE] Errore nel controllo della transazione ${txHash}:`,
+            error
+          );
           reject(error);
         }
       });
