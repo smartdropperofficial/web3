@@ -17,16 +17,30 @@ router.get("/hello", (req, res) => {
 
 router.post("/verify-subscription-payment", async (req, res) => {
   try {
+    console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+
+    const { payment_tx, price, created_at } = req.body;
+
+    if (!payment_tx || !price || !created_at) {
+      console.error("❌ [ERROR] Missing required fields:", {
+        payment_tx,
+        price,
+        created_at,
+      });
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     await monitorTransaction(
-      req.body.payment_tx,
-      parseFloat(req.body.price),
+      payment_tx,
+      parseFloat(price),
       "subscription_wallet",
-      req.body.created_at,
+      created_at,
       "subscription",
       "status",
       SubscriptionStatus.ENABLED,
       "payment_tx"
     );
+
     return res.status(200).json({
       success: true,
       message: "Transaction monitored successfully!",
@@ -39,6 +53,7 @@ router.post("/verify-subscription-payment", async (req, res) => {
     });
   }
 });
+
 router.post("/create-subscription-onchain", async (req, res) => {
   try {
     const para = req.body as CreateSubcriptionOnChainParams;
