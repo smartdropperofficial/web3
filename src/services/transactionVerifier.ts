@@ -158,11 +158,22 @@ export async function monitorTransaction(
                 continue;
               }
 
-              const difference = Math.abs(expectedAmount - actualAmount);
-              if (difference > TOLERANCE) {
+              // **🔧 NUOVA LOGICA: Registra errore solo se l'importo è minore**
+              const difference = expectedAmount - actualAmount;
+
+              console.log(`💰 Expected amount: ${expectedAmount}`);
+              console.log(`💰 Received amount: ${actualAmount}`);
+              console.log(`🔄 Difference: ${difference}`);
+
+              if (actualAmount < expectedAmount - TOLERANCE) {
                 errorDetails = `Incorrect amount: expected ${expectedAmount}, received ${actualAmount}. Difference: ${difference}`;
                 console.error(`❌ [ERROR] ${errorDetails}`);
-                continue;
+
+                console.log(
+                  `📝 Logging transaction ${txHash} error in Supabase...`
+                );
+                await logTransactionError(txHash, errorDetails);
+                return reject(new Error(errorDetails));
               }
 
               console.log("✅ [SUCCESS] Amount and recipient are correct!");
