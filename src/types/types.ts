@@ -19,17 +19,16 @@ export enum OrderStatus {
   CREATED = "CREATED",
   AWAITING_TAX = "AWAITING_TAX",
   AWAITING_PAYMENT = "AWAITING_PAYMENT",
-  CONFIRMATION_PENDING = "CONFIRMATION_PENDING",
   ORDER_CONFIRMED = "ORDER_CONFIRMED",
   SENT_TO_AMAZON = "SENT_TO_AMAZON",
-  RETURNED_TO_AMAZON = "RETURNED_TO_AMAZON",
-  RETURNED = "RETURNED",
-  CANCELED = "CANCELED",
   COMPLETED = "COMPLETED",
   SHIPPING_ADDRESS_REFUSED = "SHIPPING_ADDRESS_REFUSED",
   PRODUCT_UNAVAILABLE = "PRODUCT_UNAVAILABLE",
   ERROR = "ERROR",
   INSUFFICIENT_ZMA_BALANCE = "INSUFFICIENT_ZMA_BALANCE",
+  RETURNED_TO_AMAZON = "RETURNED_TO_AMAZON",
+  TAX_PAYMENT_CONFIRMING = "TAX_PAYMENT_CONFIRMING",
+  PRE_ORDER_PAYMENT_CONFIRMING = "PRE_ORDER_PAYMENT_CONFIRMING",
 }
 export interface SubscriptionSB {
   id?: number; // bigint
@@ -57,8 +56,8 @@ export enum SubscriptionStatus {
 export interface CreateSubcriptionOnChainParams {
   payment_tx: string;
   subscription_plan_id: number;
-  destinationAddress: string;
-  promoter_address: string;
+  wallet: string;
+  promoter: string;
   subscription_id: string;
   status: SubscriptionStatus;
   created_at: string;
