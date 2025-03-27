@@ -136,21 +136,43 @@ router.post("/verify-pre-order-payment", async (req, res) => {
     });
   }
 });
-router.post("/verify-order-confirmation-payment", (req, res) => {
-  monitorTransaction(
-    req.body.payment_tx,
-    parseFloat(req.body.amount_paid),
-    "tax_wallet",
-    req.body.created_at,
-    "orders",
-    "status",
-    OrderStatus.ORDER_CONFIRMED,
-    "payment_tx"
-  );
-  res.status(202).json({
-    success: true,
-    message: "Monitoring started for order confirmation payment.",
-  });
+router.post("/verify-tax-order-payment", async (req, res) => {
+  try {
+    console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+
+    const { payment_tx, price, created_at } = req.body;
+
+    if (!payment_tx || !price || !created_at) {
+      console.error("❌ [ERROR] Missing required fields:", {
+        payment_tx,
+        price,
+        created_at,
+      });
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    await monitorTransaction(
+      payment_tx,
+      parseFloat(price),
+      "pre_order_wallet",
+      created_at,
+      "orders",
+      "status",
+      OrderStatus.ORDER_CONFIRMED,
+      "tax_order_payment_tx"
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Transaction monitored successfully!",
+    });
+  } catch (error: any) {
+    console.log("🚀 ~ router.post ~ error:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 });
 
 export default router;
