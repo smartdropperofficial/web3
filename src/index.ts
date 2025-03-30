@@ -1,7 +1,6 @@
 import express from "express";
 import transactionsRouter from "./routes/transactionsRouter";
-import { ensureToken } from "./services/tokenService";
-import { supabase } from "./config/supabase";
+import { ensureToken } from "./middleware/tokenValidation";
 
 const app = express();
 
