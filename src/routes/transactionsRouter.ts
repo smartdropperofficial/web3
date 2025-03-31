@@ -22,6 +22,9 @@ router.post(
   validatePaymentFields,
   async (req, res) => {
     try {
+      console.log(
+        "📥 [REQUEST RECEIVED] for endpoint: /verify-subscription-payment"
+      );
       console.log("📥 [REQUEST RECEIVED]", {
         body: req.body,
         ip: req.ip,
@@ -83,7 +86,9 @@ router.post("/create-subscription-onchain", async (req, res) => {
   try {
     const para = req.body as CreateSubcriptionOnChainParams;
     console.log("🚀 ~ router.post ~ para:", para);
-
+    console.log(
+      "📥 [REQUEST RECEIVED] for endpoint: /create-subscription-onchain "
+    );
     if (para.status !== SubscriptionStatus.ENABLED) {
       return res.status(400).json({
         success: false,
@@ -108,6 +113,9 @@ router.post(
   validatePaymentFields,
   async (req, res) => {
     try {
+      console.log(
+        "📥 [REQUEST RECEIVED] for endpoint: /verify-pre-order-payment "
+      );
       console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
       const { payment_tx, price, created_at } = req.body;
@@ -150,6 +158,9 @@ router.post(
   validatePaymentFields,
   async (req, res) => {
     try {
+      console.log(
+        "📥 [REQUEST RECEIVED] for endpoint: /verify-tax-order-payment "
+      );
       console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
       const { payment_tx, price, created_at } = req.body;
@@ -166,7 +177,7 @@ router.post(
       await monitorTransaction(
         payment_tx,
         parseFloat(price),
-        "pre_order_wallet",
+        "tax_wallet",
         created_at,
         "orders",
         "status",

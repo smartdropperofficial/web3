@@ -128,6 +128,12 @@ export async function analyzeLogs(logs: any[], context: any): Promise<boolean> {
         context.errorDetails = `Unsupported token: ${tokenAddress}`;
         continue;
       }
+      console.log("🚀 ~ analyzeLogs ~ to Address:", to);
+
+      console.log(
+        "🚀 ~ analyzeLogs ~ destination Address:",
+        context.destinationAddress.toLowerCase()
+      );
 
       if (to.toLowerCase() !== context.destinationAddress.toLowerCase()) {
         context.errorDetails = `Wrong recipient: expected ${context.destinationAddress}, got ${to}`;
