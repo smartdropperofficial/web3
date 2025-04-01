@@ -2,6 +2,8 @@ import { supabase } from "../config/supabase";
 import { provider } from "../config/provider";
 import { getConfigField, getSupportedTokens } from "../utils/supabaseServices";
 import { Contract, formatUnits } from "ethers";
+import { TransactionReceipt } from "ethers";
+
 const MAX_WAIT_TIME = 120000;
 const TOLERANCE = 0.01;
 const TIME_DIFF_THRESHOLD = 5 * 60 * 1000; // 5 minutes
@@ -82,7 +84,25 @@ export async function prepareTransactionContext(
     errorDetails: "",
   };
 }
-export async function waitForConfirmation(txHash: string) {
+
+export async function waitForConfirmation(
+  txHash: string
+): Promise<TransactionReceipt> {
+  console.log(`⏳ Checking if TX ${txHash} is already confirmed...`);
+
+  // STEP 1: fallback retroattivo (magari è già confermata)
+  const existingReceipt = await provider.getTransactionReceipt(txHash);
+  if (existingReceipt && existingReceipt.blockNumber) {
+    console.log(
+      `✅ TX ${txHash} already confirmed in block ${existingReceipt.blockNumber}`
+    );
+    return existingReceipt;
+  }
+
+  // STEP 2: delay anti-race (caso in cui la tx viene minata nel mentre)
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // STEP 3: attesa attiva
   console.log(`⏳ Waiting for TX ${txHash} confirmation...`);
   const receipt = await provider.waitForTransaction(txHash, 1, MAX_WAIT_TIME);
 
@@ -92,6 +112,7 @@ export async function waitForConfirmation(txHash: string) {
 
   return receipt;
 }
+
 export async function validateTimestamp(
   receipt: any,
   orderCreatedAtMs: number
