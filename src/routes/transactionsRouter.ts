@@ -5,9 +5,9 @@ import {
 } from "../services/transactionVerifier";
 import {
   CreateSubcriptionOnChainParams,
-  OrderStatus,
   SubscriptionStatus,
 } from "../types/types";
+import { OrderStatus } from "../types/enums";
 import { validatePaymentFields } from "../middleware/validatePaymentFields";
 
 const router = Router();
@@ -136,7 +136,7 @@ router.post(
         created_at,
         "orders",
         "status",
-        OrderStatus.AWAITING_TAX,
+        OrderStatus.PREORDER_PLACED,
         "pre_order_payment_tx"
       );
 

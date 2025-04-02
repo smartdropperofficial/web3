@@ -8,6 +8,5 @@ Content-Type: application/json
   "wallet": "0x39AF390FC9FDef3e550475F12aF47D65B517FEcD",
   "payment_tx": "0xb4c975c85f26e12b573ff9819a804b8fd21efb930a03d42eb943e29fbfc5d958",
   "price": "0.01",
-  "status": "CONFIRMING",
   "created_at": "2025-03-15 21:28:12.736275+00"
 }
