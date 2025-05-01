@@ -9,6 +9,7 @@ import {
 } from "../types/types";
 import { OrderStatus } from "../types/enums";
 import { validatePaymentFields } from "../middleware/validatePaymentFields";
+import { supabase } from "../config/supabase";
 
 const router = Router();
 
@@ -199,5 +200,27 @@ router.post(
     }
   }
 );
+router.post("/webhook/zinc/tax-request", async (req, res) => {
+  const data = req.body;
+
+  if (!data.price_components || !data.merchant_order_ids?.length) {
+    return res.status(400).json({ error: "Missing required data." });
+  }
+
+  const merchantOrderId = data.merchant_order_ids[0].merchant_order_id;
+  const { subtotal, shipping, tax, total } = data.price_components;
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ subtotal, shipping, tax, total })
+    .eq("merchant_order_id", merchantOrderId);
+
+  if (error) {
+    console.error("Errore Supabase:", error);
+    return res.status(500).json({ error: "Database update failed." });
+  }
+
+  res.status(200).json({ success: true });
+});
 
 export default router;
