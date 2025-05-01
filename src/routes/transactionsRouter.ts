@@ -201,26 +201,50 @@ router.post(
   }
 );
 router.post("/webhook/zinc/tax-request", async (req, res) => {
-  const data = req.body;
+  try {
+    console.log(
+      "📥 [REQUEST RECEIVED] for endpoint: /webhook/zinc/tax-request"
+    );
+    console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
-  if (!data.price_components || !data.merchant_order_ids?.length) {
-    return res.status(400).json({ error: "Missing required data." });
+    const data = req.body;
+
+    if (!data.price_components || !data.merchant_order_ids?.length) {
+      console.error("❌ [ERROR] Missing required data:", {
+        price_components: data.price_components,
+        merchant_order_ids: data.merchant_order_ids,
+      });
+      return res.status(400).json({ error: "Missing required data." });
+    }
+
+    const merchantOrderId = data.merchant_order_ids[0].merchant_order_id;
+    const { subtotal, shipping, tax, total } = data.price_components;
+
+    console.log("🔍 [DATA EXTRACTED]", {
+      merchantOrderId,
+      subtotal,
+      shipping,
+      tax,
+      total,
+    });
+
+    console.log(
+      "📤 [DATABASE UPDATE] Attempting to update order in Supabase..."
+    );
+    const { error } = await supabase
+      .from("orders")
+      .update({ subtotal, shipping, tax, total })
+      .eq("merchant_order_id", merchantOrderId);
+
+    if (error) {
+      console.error("❌ [ERROR] Supabase update failed:", error);
+      return res.status(500).json({ error: "Database update failed." });
+    }
+
+    console.log("✅ [SUCCESS] Order updated successfully in Supabase.");
+    res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error("❌ [ERROR] Unexpected error:", error);
+    res.status(500).json({ error: "Internal server error." });
   }
-
-  const merchantOrderId = data.merchant_order_ids[0].merchant_order_id;
-  const { subtotal, shipping, tax, total } = data.price_components;
-
-  const { error } = await supabase
-    .from("orders")
-    .update({ subtotal, shipping, tax, total })
-    .eq("merchant_order_id", merchantOrderId);
-
-  if (error) {
-    console.error("Errore Supabase:", error);
-    return res.status(500).json({ error: "Database update failed." });
-  }
-
-  res.status(200).json({ success: true });
 });
-
-export default router;
