@@ -155,6 +155,51 @@ router.post(
   }
 );
 router.post(
+  "/verify-wrapper-pre-order-payment",
+  validatePaymentFields,
+  async (req, res) => {
+    try {
+      console.log(
+        "📥 [REQUEST RECEIVED] for endpoint: /verify-wrapper-pre-order-payment "
+      );
+      console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+
+      const { payment_tx, price, created_at } = req.body;
+
+      if (!payment_tx || !price || !created_at) {
+        console.error("❌ [ERROR] Missing required fields:", {
+          payment_tx,
+          price,
+          created_at,
+        });
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      await monitorTransaction(
+        payment_tx,
+        parseFloat(price),
+        "pre_order_wallet",
+        created_at,
+        "order",
+        "status",
+        OrderStatus.PREORDER_PLACED,
+        "pre_order_payment_tx"
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Transaction monitored successfully!",
+      });
+    } catch (error: any) {
+      console.log("❌ [ERROR]:", error);
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+router.post(
   "/verify-tax-order-payment",
   validatePaymentFields,
   async (req, res) => {
@@ -233,8 +278,13 @@ router.post("/webhook/zinc/tax-request", async (req, res) => {
     );
     const { error } = await supabase
       .from("orders")
-      .update({ subtotal, shipping, tax, total })
-      .eq("merchant_order_id", merchantOrderId);
+      .update({
+        subtotal_amount: subtotal,
+        shipping_amount: shipping,
+        tax_amount: tax,
+        total_amount: total,
+      })
+      .eq("order_id", merchantOrderId);
 
     if (error) {
       console.error("❌ [ERROR] Supabase update failed:", error);
@@ -248,3 +298,4 @@ router.post("/webhook/zinc/tax-request", async (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 });
+export default router;

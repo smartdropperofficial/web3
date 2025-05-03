@@ -8,7 +8,8 @@ const app = express();
 app.use(express.json());
 
 // Registriamo il router sotto `/api`
-app.use("/api", ensureToken, transactionsRouter);
+// app.use("/api", ensureToken, transactionsRouter);
+app.use("/api", transactionsRouter);
 
 console.log("✅ Transactions Router registrato su /api");
 

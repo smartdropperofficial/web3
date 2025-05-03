@@ -1,0 +1,26 @@
+### Test Webhook Zinc - Simulazione payload
+POST http://localhost:4000/api/webhook/zinc/tax-request
+Content-Type: application/json
+
+{
+  "_type": "order_response",
+  "price_components": {
+    "subtotal": 1999,
+    "shipping": 5.99,
+    "tax": 1.99,
+    "total": 1999,
+    "currency": "USD"
+  },
+  "merchant_order_ids": [
+    {
+      "merchant_order_id": "5661-965983-1716",
+      "merchant": "amazon",
+      "account": "[email protected]",
+      "placed_at": "2025-04-29T15:21:08.366Z"
+    }
+  ],
+  "tracking": [],
+  "request": {
+    "client_request_id": "test-order-001"
+  }
+}

@@ -34,13 +34,15 @@ export async function updateTableStatus(
   identifierColumn: string
 ) {
   console.log(
-    `🔄 Attempting to update ${table}.${statusColumn} for ${txHash}...`
+    `🔄 Attempting to update ${table}.${statusColumn} for column ${statusColumn} with value ${txHash}...`
   );
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(table)
     .update({ [statusColumn]: newStatus })
-    .eq(identifierColumn, txHash);
+    .eq(identifierColumn, txHash)
+    .select()
+    .single();
 
   if (error) {
     console.error(
