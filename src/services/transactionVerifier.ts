@@ -361,7 +361,7 @@ export const createPreorders = async (
           quantity: product.quantity,
         })) || [],
       wrapper_id: typedOrder.order_id,
-      status: OrderStatus.PREORDER_PLACED,
+      status: OrderStatus.AWAITING_TAX,
     }));
 
     console.log("✅ [STEP 3] Orders mapped. Preview of first order:");
