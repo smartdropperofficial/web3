@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  createPreorders,
   createSubscriptionOnBlockchain,
   monitorTransaction,
 } from "../services/transactionVerifier";
@@ -245,6 +246,36 @@ router.post(
     }
   }
 );
+router.post("/create-pre-orders", async (req, res) => {
+  try {
+    console.log("📥 [REQUEST RECEIVED] for endpoint: /create-pre-orders ");
+    console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+
+    const { order_id, basket_ids } = req.body;
+
+    if (!order_id || !basket_ids) {
+      console.error("❌ [ERROR] Missing required fields:", {
+        order_id: order_id,
+        basket_ids: basket_ids,
+      });
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    await createPreorders(order_id, basket_ids);
+
+    return res.status(200).json({
+      success: true,
+      message: "Transaction monitored successfully!",
+    });
+  } catch (error: any) {
+    console.error("❌ [ERROR]:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 router.post("/webhook/zinc/tax-request", async (req, res) => {
   try {
     console.log(

@@ -6,11 +6,16 @@ import {
   updateTableStatus,
   validateTimestamp,
   waitForConfirmation,
-} from "./transactions";
+} from "./monitoring/transactions";
 import { supabase } from "../config/supabase";
 import { initializeTaxWallet } from "../utils/web3";
 import subscriptionManagementABI from "../abi/subscriptionManagementABI.json";
-import { CreateSubcriptionOnChainParams } from "../types/types";
+import {
+  CreateSubcriptionOnChainParams,
+  OrderSB,
+  OrdersSB,
+  OrderStatus,
+} from "../types/types";
 
 const pendingTransactions: Record<string, boolean> = {};
 
@@ -265,3 +270,130 @@ async function estimateAndCreateSubscriptionTransaction(
     throw error;
   }
 }
+
+export const createPreorders = async (
+  order_id: string,
+  basket_ids: string[]
+): Promise<OrdersSB[]> => {
+  console.log("🔍 [CREATE PREORDERS] Start");
+  console.log("🔹 order_id:", order_id);
+  console.log(
+    "🔹 basket_ids:",
+    Array.isArray(basket_ids) ? basket_ids : "❌ Not an array"
+  );
+
+  try {
+    console.log("🔍 [STEP 1] Fetching order details from 'orders' table...");
+    const { data: order, error: orderError } = await supabase
+      .from("order")
+      .select("*")
+      .eq("order_id", order_id)
+      .single();
+
+    if (orderError || !order) {
+      console.error("❌ [ERROR] Failed to fetch order:", orderError?.message);
+      throw new Error(
+        `Errore nel recupero dell'ordine: ${orderError?.message}`
+      );
+    }
+
+    console.log("✅ [STEP 1] Order fetched successfully. Fields:");
+    console.log(Object.keys(order));
+    console.log("📦 Order JSON:", JSON.stringify(order, null, 2));
+
+    const typedOrder: OrderSB = order as OrderSB;
+
+    console.log(
+      "🔍 [STEP 2] Fetching basket details from 'basket_multi' table..."
+    );
+    const { data: baskets, error: basketError } = await supabase
+      .from("basket_multi")
+      .select("*")
+      .in("basket_id", basket_ids);
+
+    if (basketError) {
+      console.error("❌ [ERROR] Failed to fetch baskets:", basketError.message);
+      throw new Error(`Errore nel recupero dei basket: ${basketError.message}`);
+    }
+
+    if (!baskets || baskets.length === 0) {
+      console.warn("⚠️ [WARNING] No baskets found for the provided IDs.");
+      return [];
+    }
+
+    console.log(`✅ [STEP 2] Fetched ${baskets.length} baskets.`);
+    console.table(
+      baskets.map((b) => ({
+        basket_id: b.basket_id,
+        total_items: b.total_items,
+        email: b.email,
+      }))
+    );
+
+    console.log("🔍 [STEP 3] Mapping baskets to orders...");
+    const ordersList: OrdersSB[] = baskets.map((basket: any) => ({
+      wallet_address: typedOrder.wallet_address,
+      country: typedOrder.zone || "US",
+      email: typedOrder.email,
+      currency: typedOrder.currency || "USD",
+      retailer: typedOrder.retailer,
+      shipping_info: basket.shipping_info
+        ? {
+            first_name: basket.shipping_info.first_name,
+            last_name: basket.shipping_info.last_name,
+            address_line1: basket.shipping_info.address_line1,
+            address_line2: basket.shipping_info.address_line2,
+            zip_code: basket.shipping_info.zip_code,
+            city: basket.shipping_info.city,
+            state: basket.shipping_info.state,
+            phone_number: basket.shipping_info.phone_number,
+            email: basket.shipping_info.email,
+          }
+        : undefined,
+      products:
+        basket.products?.map((product: any) => ({
+          asin: product.asin,
+          image: product.image,
+          symbol: product.symbol,
+          title: product.title,
+          url: product.url,
+          price: Number(product.price),
+          quantity: product.quantity,
+        })) || [],
+      wrapper_id: typedOrder.order_id,
+      status: OrderStatus.PREORDER_PLACED,
+    }));
+
+    console.log("✅ [STEP 3] Orders mapped. Preview of first order:");
+    console.log(JSON.stringify(ordersList[0], null, 2));
+
+    console.log("🔍 [STEP 4] Inserting orders into 'orders' table...");
+    const { error: insertError } = await supabase
+      .from("orders")
+      .insert(ordersList);
+
+    if (insertError) {
+      console.error(
+        "❌ [ERROR] Failed to insert orders into 'orders' table:",
+        insertError.message
+      );
+      throw new Error(
+        `Errore durante l'inserimento degli ordini: ${insertError.message}`
+      );
+    }
+
+    console.log("✅ [STEP 4] Orders inserted successfully.");
+    console.table(
+      ordersList.map((o) => ({
+        wrapper_id: o.order_id,
+        email: o.email,
+      }))
+    );
+
+    console.log("🎉 [CREATE PREORDERS] Completed successfully.");
+    return ordersList;
+  } catch (error) {
+    console.error("❌ [FATAL ERROR] createPreorders failed:", error);
+    throw error;
+  }
+};

@@ -1,6 +1,5 @@
 import express from "express";
 import transactionsRouter from "./routes/transactionsRouter";
-import { ensureToken } from "./middleware/tokenValidation";
 
 const app = express();
 
