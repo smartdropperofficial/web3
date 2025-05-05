@@ -85,7 +85,6 @@ export interface OrdersSB {
   // id?: number;
   created_at?: string; // timestamp with time zone
   wallet_address?: string;
-  country?: string;
   status?: OrderStatus;
   order_id?: string;
   shipping_info?: ShippingInfoSB; // puoi usare un tipo più specifico se conosci la struttura JSON

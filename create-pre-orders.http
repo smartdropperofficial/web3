@@ -4,6 +4,6 @@ Content-Type: application/json
 Authorization: Bearer your_jwt_token_here
 
 {
-  "order_id": "7249-652954-0438",
+  "order_id": "2965-142977-9611",
   "basket_ids": ["6247-425004-9807","6247-425004-9809"]
 }

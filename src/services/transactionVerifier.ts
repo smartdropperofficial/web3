@@ -283,7 +283,7 @@ export const createPreorders = async (
   );
 
   try {
-    console.log("🔍 [STEP 1] Fetching order details from 'orders' table...");
+    console.log("🔍 [STEP 1] Fetching order details from 'order' table...");
     const { data: order, error: orderError } = await supabase
       .from("order")
       .select("*")
@@ -331,38 +331,56 @@ export const createPreorders = async (
     );
 
     console.log("🔍 [STEP 3] Mapping baskets to orders...");
-    const ordersList: OrdersSB[] = baskets.map((basket: any) => ({
-      wallet_address: typedOrder.wallet_address,
-      country: typedOrder.zone || "US",
-      email: typedOrder.email,
-      currency: typedOrder.currency || "USD",
-      retailer: typedOrder.retailer,
-      shipping_info: basket.shipping_info
-        ? {
-            first_name: basket.shipping_info.first_name,
-            last_name: basket.shipping_info.last_name,
-            address_line1: basket.shipping_info.address_line1,
-            address_line2: basket.shipping_info.address_line2,
-            zip_code: basket.shipping_info.zip_code,
-            city: basket.shipping_info.city,
-            state: basket.shipping_info.state,
-            phone_number: basket.shipping_info.phone_number,
-            email: basket.shipping_info.email,
-          }
-        : undefined,
-      products:
-        basket.products?.map((product: any) => ({
-          asin: product.asin,
-          image: product.image,
-          symbol: product.symbol,
-          title: product.title,
-          url: product.url,
-          price: Number(product.price),
-          quantity: product.quantity,
-        })) || [],
-      wrapper_id: typedOrder.order_id,
-      status: OrderStatus.AWAITING_TAX,
-    }));
+    const ordersList: OrdersSB[] = baskets.map((basket: any) => {
+      // 🔄 Unifica prodotti per ASIN sommando le quantità
+      const mergedProductsMap = new Map<string, any>();
+
+      basket.products?.forEach((product: any) => {
+        const asin = product.asin;
+        if (!asin) return;
+
+        if (mergedProductsMap.has(asin)) {
+          const existing = mergedProductsMap.get(asin);
+          existing.quantity += product.quantity;
+        } else {
+          mergedProductsMap.set(asin, {
+            asin: product.asin,
+            image: product.image,
+            symbol: product.symbol,
+            title: product.title,
+            url: product.url,
+            price: Number(product.price),
+            quantity: product.quantity,
+          });
+        }
+      });
+
+      const mergedProducts = Array.from(mergedProductsMap.values());
+
+      return {
+        wallet_address: typedOrder.wallet_address,
+        zone: typedOrder.zone || "US",
+        email: typedOrder.email,
+        currency: typedOrder.currency || "USD",
+        retailer: typedOrder.retailer,
+        shipping_info: basket.shipping_info
+          ? {
+              first_name: basket.shipping_info.first_name,
+              last_name: basket.shipping_info.last_name,
+              address_line1: basket.shipping_info.address_line1,
+              address_line2: basket.shipping_info.address_line2,
+              zip_code: basket.shipping_info.zip_code,
+              city: basket.shipping_info.city,
+              state: basket.shipping_info.state,
+              phone_number: basket.shipping_info.phone_number,
+              email: basket.shipping_info.email,
+            }
+          : undefined,
+        products: mergedProducts,
+        wrapper_id: typedOrder.order_id,
+        status: OrderStatus.AWAITING_TAX,
+      };
+    });
 
     console.log("✅ [STEP 3] Orders mapped. Preview of first order:");
     console.log(JSON.stringify(ordersList[0], null, 2));
@@ -385,7 +403,7 @@ export const createPreorders = async (
     console.log("✅ [STEP 4] Orders inserted successfully.");
     console.table(
       ordersList.map((o) => ({
-        wrapper_id: o.order_id,
+        wrapper_id: order_id,
         email: o.email,
       }))
     );
