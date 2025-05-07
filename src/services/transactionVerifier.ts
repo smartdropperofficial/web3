@@ -378,7 +378,7 @@ export const createPreorders = async (
           : undefined,
         products: mergedProducts,
         wrapper_id: typedOrder.order_id,
-        status: OrderStatus.AWAITING_TAX,
+        status: OrderStatus.PREORDER_PLACED,
       };
     });
 
