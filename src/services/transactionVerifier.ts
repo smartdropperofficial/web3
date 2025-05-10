@@ -378,6 +378,8 @@ export const createPreorders = async (
           : undefined,
         products: mergedProducts,
         wrapper_id: typedOrder.order_id,
+        pre_order_payment_tx: typedOrder.pre_order_payment_tx,
+
         status: OrderStatus.PREORDER_PLACED,
       };
     });
