@@ -378,14 +378,13 @@ export const createPreorders = async (
           : undefined,
         products: mergedProducts,
         wrapper_id: typedOrder.order_id,
-        pre_order_payment_tx: typedOrder.pre_order_payment_tx,
 
         status: OrderStatus.PREORDER_PLACED,
       };
     });
 
     console.log("✅ [STEP 3] Orders mapped. Preview of first order:");
-    console.log(JSON.stringify(ordersList[0], null, 2));
+    console.log(JSON.stringify(ordersList, null, 2));
 
     console.log("🔍 [STEP 4] Inserting orders into 'orders' table...");
     const { error: insertError } = await supabase
