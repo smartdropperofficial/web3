@@ -1,5 +1,6 @@
 import express from "express";
 import transactionsRouter from "./routes/transactionsRouter";
+import { ensureToken } from "./middleware/tokenValidation";
 
 const app = express();
 
@@ -8,7 +9,7 @@ app.use(express.json());
 
 // Registriamo il router sotto `/api`
 // app.use("/api", ensureToken, transactionsRouter);
-app.use("/api", transactionsRouter);
+app.use("/api", ensureToken, transactionsRouter);
 
 console.log("✅ Transactions Router registrato su /api");
 
