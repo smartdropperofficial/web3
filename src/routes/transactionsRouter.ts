@@ -138,7 +138,7 @@ router.post(
         created_at,
         "orders",
         "status",
-        OrderStatus.PREORDER_PLACED,
+        OrderStatus.AWAITING_TAX,
         "pre_order_payment_tx"
       );
 
