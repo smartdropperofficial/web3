@@ -1,15 +1,15 @@
-import { supabase } from "../../config/supabase";
-import { provider } from "../../config/provider";
+import { supabase } from "../../../config/supabase";
+import { provider } from "../../../config/provider";
 import {
   getConfigField,
   getSupportedTokens,
-} from "../../utils/supabaseServices";
+} from "../../../utils/supabaseServices";
 import { Contract, formatUnits } from "ethers";
 import { TransactionReceipt } from "ethers";
 
 const MAX_WAIT_TIME = 120000;
 const TOLERANCE = 0.01;
-const TIME_DIFF_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+const TIME_DIFF_THRESHOLD = 30 * 60 * 1000; // 5 minutes
 const ERC20_ABI = [
   "event Transfer(address indexed from, address indexed to, uint256 value)",
 ];

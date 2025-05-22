@@ -1,9 +1,10 @@
 import { Router } from "express";
 import {
-  createPreorders,
+  createMultiPreorders,
+  createSinglePreorder,
   createSubscriptionOnBlockchain,
-  monitorTransaction,
-} from "../services/transactionVerifier";
+} from "../services/updateStatus/index";
+import { monitorTransaction } from "../services/transactionVerifier";
 import {
   CreateSubcriptionOnChainParams,
   SubscriptionStatus,
@@ -11,6 +12,8 @@ import {
 import { OrderStatus } from "../types/enums";
 import { validatePaymentFields } from "../middleware/validatePaymentFields";
 import { supabase } from "../config/supabase";
+import { pollTransactionUntilFinal } from "../services/monitoring/thirdPartServices/ExolixStatus";
+import { updateTableStatus } from "../services/monitoring/blockchain/transactions";
 
 const router = Router();
 
@@ -84,7 +87,7 @@ router.post(
     }
   }
 );
-router.post("/create-subscription-onchain", async (req, res) => {
+router.post("/create-stablecoin-subscription-onchain", async (req, res) => {
   try {
     const para = req.body as CreateSubcriptionOnChainParams;
     console.log("🚀 ~ router.post ~ para:", para);
@@ -111,7 +114,7 @@ router.post("/create-subscription-onchain", async (req, res) => {
   }
 });
 router.post(
-  "/verify-pre-order-payment",
+  "/verify-single-pre-order-payment-stablecoin",
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -120,13 +123,14 @@ router.post(
       );
       console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
-      const { payment_tx, price, created_at } = req.body;
+      const { payment_tx, price, created_at, basket_id } = req.body;
 
-      if (!payment_tx || !price || !created_at) {
+      if (!payment_tx || !price || !created_at || !basket_id) {
         console.error("❌ [ERROR] Missing required fields:", {
           payment_tx,
           price,
           created_at,
+          basket_id,
         });
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -142,6 +146,8 @@ router.post(
         "pre_order_payment_tx"
       );
 
+      await createSinglePreorder(basket_id);
+
       return res.status(200).json({
         success: true,
         message: "Transaction monitored successfully!",
@@ -156,7 +162,7 @@ router.post(
   }
 );
 router.post(
-  "/verify-wrapper-pre-order-payment",
+  "/verify-multi-pre-order-payment-stablecoin",
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -183,7 +189,7 @@ router.post(
         created_at,
         "order",
         "status",
-        OrderStatus.PREORDER_PLACED,
+        OrderStatus.AWAITING_TAX,
         "pre_order_payment_tx"
       );
 
@@ -201,7 +207,7 @@ router.post(
   }
 );
 router.post(
-  "/verify-tax-order-payment",
+  "/verify-tax-payment-stablecoin",
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -221,7 +227,7 @@ router.post(
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      await monitorTransaction(
+      const context = await monitorTransaction(
         payment_tx,
         parseFloat(price),
         "tax_wallet",
@@ -231,7 +237,13 @@ router.post(
         OrderStatus.ORDER_CONFIRMED,
         "tax_order_payment_tx"
       );
-
+      await updateTableStatus(
+        context.txHash,
+        context.table,
+        context.statusColumn,
+        context.newStatus,
+        context.identifierColumn
+      );
       return res.status(200).json({
         success: true,
         message: "Transaction monitored successfully!",
@@ -246,7 +258,7 @@ router.post(
     }
   }
 );
-router.post("/create-pre-orders", async (req, res) => {
+router.post("/create-multi-pre-orders", async (req, res) => {
   try {
     console.log("📥 [REQUEST RECEIVED] for endpoint: /create-pre-orders ");
     console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
@@ -261,7 +273,7 @@ router.post("/create-pre-orders", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    await createPreorders(order_id, basket_ids);
+    await createMultiPreorders(order_id, basket_ids);
 
     return res.status(200).json({
       success: true,
@@ -276,6 +288,37 @@ router.post("/create-pre-orders", async (req, res) => {
     });
   }
 });
+// router.post("/create-single-pre-order", async (req, res) => {
+//   try {
+//     console.log(
+//       "📥 [REQUEST RECEIVED] for endpoint: /create-single-pre-order "
+//     );
+//     console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+
+//     const { basket_id } = req.body;
+
+//     if (!basket_id) {
+//       console.error("❌ [ERROR] Missing required fields:", {
+//         basket_id: basket_id,
+//       });
+//       return res.status(400).json({ error: "Missing required fields" });
+//     }
+
+//     await createSinglePreorder(basket_id);
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Transaction monitored successfully!",
+//     });
+//   } catch (error: any) {
+//     console.error("❌ [ERROR]:", error);
+
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// });
 router.post("/webhook/zinc/tax-request", async (req, res) => {
   try {
     console.log(
@@ -329,4 +372,25 @@ router.post("/webhook/zinc/tax-request", async (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
+router.post("/verify-payment-cryptocurrency", async (req, res) => {
+  const { tx_id, order_id } = req.body;
+
+  if (!tx_id || !order_id) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing required fields: tx_id and order_id",
+    });
+  }
+
+  pollTransactionUntilFinal(tx_id, order_id).catch((err) =>
+    console.error(`❌ Background polling error for ${tx_id}:`, err)
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: `Monitoring started for transaction ${tx_id} (order ${order_id})`,
+  });
+});
+
 export default router;
