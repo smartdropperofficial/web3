@@ -1,0 +1,10 @@
+version: 1.0
+runtime: nodejs18
+
+build:
+  commands:
+    - npm install --include=dev
+    - npm run build
+
+start:
+  command: npm start
