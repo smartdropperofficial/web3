@@ -1,9 +1,35 @@
-// src/app.ts
 import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
 import transactionRoutes from "./routes/transactionsRouter";
+import { ensureToken } from "./middleware/tokenValidation";
 
-const app = express(); // Niente express.json() qui
+const app = express();
 
-app.use("/api", transactionRoutes);
+// Sicurezza base
+app.use(helmet());
+app.use(express.json());
+
+// Rate limit globale
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 min
+  max: 30,
+});
+app.use(limiter);
+
+// Estensione tipo per req.user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
+// Middleware auth sicuro
+
+// Applica il middleware a tutte le route protette
+app.use("/api", ensureToken, transactionRoutes);
 
 export default app;
