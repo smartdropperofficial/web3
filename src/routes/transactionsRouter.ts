@@ -14,16 +14,18 @@ import { validatePaymentFields } from "../middleware/validatePaymentFields";
 import { supabase } from "../config/supabase";
 import { pollTransactionUntilFinal } from "../services/monitoring/thirdPartServices/ExolixStatus";
 import { updateTableStatus } from "../services/monitoring/blockchain/transactions";
+import { ensureToken } from "../middleware/tokenValidation";
 
 const router = Router();
 
-// router.get("/hello", (req, res) => {
-//   res.status(200).send("Hello, world!");
-// });
+router.get("/hello", (req, res) => {
+  res.status(200).send("Hello, world!");
+});
 const pendingTransactions: { [txHash: string]: boolean } = {};
 
 router.post(
   "/verify-subscription-payment",
+  ensureToken,
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -87,34 +89,39 @@ router.post(
     }
   }
 );
-router.post("/create-stablecoin-subscription-onchain", async (req, res) => {
-  try {
-    const para = req.body as CreateSubcriptionOnChainParams;
-    console.log("🚀 ~ router.post ~ para:", para);
-    console.log(
-      "📥 [REQUEST RECEIVED] for endpoint: /create-subscription-onchain "
-    );
-    if (para.status !== SubscriptionStatus.ENABLED) {
+router.post(
+  "/create-stablecoin-subscription-onchain",
+  ensureToken,
+  async (req, res) => {
+    try {
+      const para = req.body as CreateSubcriptionOnChainParams;
+      console.log("🚀 ~ router.post ~ para:", para);
+      console.log(
+        "📥 [REQUEST RECEIVED] for endpoint: /create-subscription-onchain "
+      );
+      if (para.status !== SubscriptionStatus.ENABLED) {
+        return res.status(400).json({
+          success: false,
+          message: "Subscription is not in confirming state",
+        });
+      } else {
+        await createSubscriptionOnBlockchain(para);
+        return res.status(200).json({
+          success: true,
+          message: "Transaction monitored successfully!",
+        });
+      }
+    } catch (error: any) {
       return res.status(400).json({
         success: false,
-        message: "Subscription is not in confirming state",
-      });
-    } else {
-      await createSubscriptionOnBlockchain(para);
-      return res.status(200).json({
-        success: true,
-        message: "Transaction monitored successfully!",
+        message: error.message,
       });
     }
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
   }
-});
+);
 router.post(
   "/verify-single-pre-order-payment-stablecoin",
+  ensureToken,
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -163,6 +170,7 @@ router.post(
 );
 router.post(
   "/verify-multi-pre-order-payment-stablecoin",
+  ensureToken,
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -208,6 +216,7 @@ router.post(
 );
 router.post(
   "/verify-tax-payment-stablecoin",
+  ensureToken,
   validatePaymentFields,
   async (req, res) => {
     try {
@@ -258,7 +267,7 @@ router.post(
     }
   }
 );
-router.post("/create-multi-pre-orders", async (req, res) => {
+router.post("/create-multi-pre-orders", ensureToken, async (req, res) => {
   try {
     console.log("📥 [REQUEST RECEIVED] for endpoint: /create-pre-orders ");
     console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
@@ -319,7 +328,7 @@ router.post("/create-multi-pre-orders", async (req, res) => {
 //     });
 //   }
 // });
-router.post("/webhook/zinc/tax-request", async (req, res) => {
+router.post("/webhook/zinc/tax-request", ensureToken, async (req, res) => {
   try {
     console.log(
       "📥 [REQUEST RECEIVED] for endpoint: /webhook/zinc/tax-request"
@@ -373,7 +382,7 @@ router.post("/webhook/zinc/tax-request", async (req, res) => {
   }
 });
 
-router.post("/verify-payment-cryptocurrency", async (req, res) => {
+router.post("/verify-payment-cryptocurrency", ensureToken, async (req, res) => {
   const { tx_id, order_id } = req.body;
 
   if (!tx_id || !order_id) {

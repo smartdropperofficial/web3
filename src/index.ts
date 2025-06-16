@@ -8,12 +8,12 @@ app.use(express.json());
 
 app.use("/api", ensureToken, transactionsRouter);
 
-console.log("✅ Transactions Router registrato su /api");
-
 // 🔹 Avvia il server SOLO SE siamo in locale
-const port = parseInt(process.env.PORT || "8080", 10);
+if (process.env.NODE_ENV !== "vercel") {
+  const PORT = process.env.PORT || 8080;
+  app.listen(PORT, () => {
+    console.log(`✅ Server in esecuzione su http://localhost:${PORT}`);
+  });
+}
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`✅ Server in esecuzione su http://0.0.0.0:${port}`);
-});
 // 🔹 Esportiamo Express per Vercel
