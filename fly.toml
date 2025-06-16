@@ -1,3 +1,6 @@
+app = 'web3-bold-sea-5098'
+primary_region = 'ord'
+
 [[services]]
   internal_port = 8080
   protocol = "tcp"
