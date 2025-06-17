@@ -5,6 +5,7 @@ import transactionRoutes from "./routes/transactionsRouter";
 import { ensureToken } from "./middleware/tokenValidation";
 
 const app = express();
+app.set("trust proxy", true);
 
 // Sicurezza base
 app.use(helmet());
