@@ -71,7 +71,13 @@ router.post(
       );
 
       delete pendingTransactions[payment_tx];
-
+      await updateTableStatus(
+        payment_tx,
+        "subscription",
+        "status",
+        SubscriptionStatus.ENABLED,
+        "payment_tx"
+      );
       return res.status(200).json({
         success: true,
         message: "Transaction monitored successfully!",
