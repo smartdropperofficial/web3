@@ -1,12 +1,12 @@
 ### Inserimento dati nella tabella subscription
 #POST  https://api.smartdropper.io/
-POST  http://localhost:4000/api/verify-pre-order-payment
-authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEyMywiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicm9sZSI6ImFkbWluIn0.JdBB91sQCX5cnczZn4hfm9ztKJijsUNMYsbC1PLEKhQ
+POST  http://localhost:8080/api/verify-subscription-payment
+authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.heA2sLWvjOKrVT9D9j2yvEsUZd9c__8zfCpXoevWTso
 Content-Type: application/json
 
 {
   "wallet": "0x39AF390FC9FDef3e550475F12aF47D65B517FEcD",
-  "payment_tx": "0xb4c975c85f26e12b573ff9819a804b8fd21efb930a03d42eb943e29fbfc5d958",
+  "payment_tx": "0x93723f97de34183c8d7478067a283ce252b8cdb61bb88d00a513aada67a241d3",
   "price": "0.01",
-  "created_at": "2025-03-15 21:28:12.736275+00"
+  "created_at": "2025-06-17T20:49:12.650Z"
 }
