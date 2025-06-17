@@ -12,21 +12,22 @@ app.use(express.json());
 
 // Rate limit globale
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 min
+  windowMs: 1 * 60 * 1000,
   max: 30,
 });
 app.use(limiter);
 
-// Estensione tipo per req.user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-    }
-  }
-}
+// Rotte pubbliche (no token)
+const publicRouter = express.Router();
+publicRouter.get("/health", (_, res) => res.send("OK"));
+app.use("/api", publicRouter);
 
-// Applica il middleware a tutte le route protette
-app.use("/api", ensureToken, transactionRoutes);
+app.use((req, res, next) => {
+  if (req.path === "/api/health") return next(); // skip limiter
+  return limiter(req, res, next);
+});
+
+// Rotte protette
+app.use("/api", ensureToken, limiter, transactionRoutes);
 
 export default app;

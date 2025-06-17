@@ -19,8 +19,10 @@ import { ensureToken } from "../middleware/tokenValidation";
 const router = Router();
 
 router.get("/hello", (req, res) => {
-  res.status(200).send("Hello, world!");
+  res.status(200).send("Hello");
 });
+router.get("/health", (_, res) => res.send("OK"));
+
 const pendingTransactions: { [txHash: string]: boolean } = {};
 
 router.post(

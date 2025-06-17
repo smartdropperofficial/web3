@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  web3-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    command: npm run start
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: package.json
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl --fail http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
