@@ -1,0 +1,27 @@
+app = "smartdropper-prod"
+primary_region = "ord"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false         # ❌ NON spegnere mai
+  auto_start_machines = true         # ✅ Riaccendi se necessario
+  min_machines_running = 1           # ✅ Mantieni almeno una attiva
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.http_api_health]
+    grace_period = "15s"
+    interval = "10s"
+    method = "get"
+    path = "/api/health"
+    port = 8080
+    timeout = "5s"
+    type = "http"
