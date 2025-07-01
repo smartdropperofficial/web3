@@ -208,7 +208,7 @@ router.post(
         OrderStatus.AWAITING_TAX,
         "pre_order_payment_tx"
       );
-
+      await createMultiPreorders(req.body.order_id, req.body.basket_ids);
       return res.status(200).json({
         success: true,
         message: "Transaction monitored successfully!",
