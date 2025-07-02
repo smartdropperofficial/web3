@@ -134,7 +134,7 @@ router.post(
   async (req, res) => {
     try {
       console.log(
-        "📥 [REQUEST RECEIVED] for endpoint: /verify-pre-order-payment "
+        "📥 [REQUEST RECEIVED] for endpoint: /verify-single-pre-order-payment-stablecoin"
       );
       console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
@@ -150,6 +150,10 @@ router.post(
         return res.status(400).json({ error: "Missing required fields" });
       }
 
+      console.log(
+        `[INFO] Starting transaction monitoring for payment_tx: ${payment_tx}, price: ${price}, created_at: ${created_at}, basket_id: ${basket_id}`
+      );
+
       await monitorTransaction(
         payment_tx,
         parseFloat(price),
@@ -161,14 +165,26 @@ router.post(
         "pre_order_payment_tx"
       );
 
+      console.log(
+        `[INFO] Transaction monitoring completed for payment_tx: ${payment_tx}. Proceeding to create single preorder for basket_id: ${basket_id}`
+      );
+
       await createSinglePreorder(basket_id);
+
+      console.log(
+        `[SUCCESS] Single preorder created successfully for basket_id: ${basket_id}`
+      );
 
       return res.status(200).json({
         success: true,
-        message: "Transaction monitored successfully!",
+        message:
+          "Transaction monitored and single preorder created successfully!",
       });
     } catch (error: any) {
-      console.log("❌ [ERROR]:", error);
+      console.error(
+        "❌ [ERROR] Exception occurred during single preorder verification:",
+        error
+      );
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -181,22 +197,38 @@ router.post(
   ensureToken,
   validatePaymentFields,
   async (req, res) => {
+    const fn = "[verify-multi-pre-order-payment-stablecoin]";
     try {
       console.log(
-        "📥 [REQUEST RECEIVED] for endpoint: /verify-wrapper-pre-order-payment "
+        `${fn} 📥 [REQUEST RECEIVED] Endpoint: /verify-multi-pre-order-payment-stablecoin`
       );
-      console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+      console.log(`${fn} 📥 [REQUEST RECEIVED] Full request body:`, req.body);
 
-      const { payment_tx, price, created_at } = req.body;
+      const { payment_tx, price, created_at, order_id, basket_ids } = req.body;
+      console.log(`${fn} [INFO] Extracted fields:`, {
+        payment_tx,
+        price,
+        created_at,
+        order_id,
+        basket_ids,
+      });
 
-      if (!payment_tx || !price || !created_at) {
-        console.error("❌ [ERROR] Missing required fields:", {
+      if (!payment_tx || !price || !created_at || !order_id || !basket_ids) {
+        console.error(`${fn} ❌ [ERROR] Missing required fields:`, {
           payment_tx,
           price,
           created_at,
+          order_id,
+          basket_ids,
         });
         return res.status(400).json({ error: "Missing required fields" });
       }
+
+      console.log(
+        `${fn} [INFO] Starting transaction monitoring for payment_tx: ${payment_tx}, price: ${price}, created_at: ${created_at}, order_id: ${order_id}, basket_ids: ${JSON.stringify(
+          basket_ids
+        )}`
+      );
 
       await monitorTransaction(
         payment_tx,
@@ -205,16 +237,40 @@ router.post(
         created_at,
         "order",
         "status",
-        OrderStatus.AWAITING_TAX,
+        OrderStatus.PREORDER_PAYMENT_CONFIRMED,
         "pre_order_payment_tx"
       );
-      await createMultiPreorders(req.body.order_id, req.body.basket_ids);
+      await updateTableStatus(
+        payment_tx,
+        "order",
+        "status",
+        OrderStatus.PREORDER_PAYMENT_CONFIRMED,
+        "pre_order_payment_tx"
+      );
+      console.log(
+        `${fn} [INFO] Transaction monitoring completed for payment_tx: ${payment_tx}. Proceeding to create multi preorders for order_id: ${order_id}, basket_ids: ${JSON.stringify(
+          basket_ids
+        )}`
+      );
+
+      await createMultiPreorders(order_id, basket_ids);
+
+      console.log(
+        `${fn} ✅ [SUCCESS] Multi preorders created successfully for order_id: ${order_id}, basket_ids: ${JSON.stringify(
+          basket_ids
+        )}`
+      );
+
       return res.status(200).json({
         success: true,
-        message: "Transaction monitored successfully!",
+        message:
+          "Transaction monitored and multi preorders created successfully!",
       });
     } catch (error: any) {
-      console.log("❌ [ERROR]:", error);
+      console.error(
+        `${fn} ❌ [ERROR] Exception occurred during multi preorder verification:`,
+        error
+      );
       return res.status(400).json({
         success: false,
         message: error.message,
