@@ -195,7 +195,7 @@ router.post(
 router.post(
   "/verify-multi-pre-order-payment-stablecoin",
   ensureToken,
-  validatePaymentFields,
+  // validatePaymentFields,
   async (req, res) => {
     const fn = "[verify-multi-pre-order-payment-stablecoin]";
     try {
@@ -204,7 +204,13 @@ router.post(
       );
       console.log(`${fn} 📥 [REQUEST RECEIVED] Full request body:`, req.body);
 
-      const { payment_tx, price, created_at, order_id, basket_ids } = req.body;
+      const {
+        pre_order_payment_tx: payment_tx,
+        pre_order_amount: price,
+        modified_at: created_at,
+        order_id,
+        basket_ids,
+      } = req.body;
       console.log(`${fn} [INFO] Extracted fields:`, {
         payment_tx,
         price,
