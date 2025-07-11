@@ -112,6 +112,8 @@ export interface OrdersSB {
   pre_order_payment_tx?: string;
   tax_order_amount?: number;
   tax_order_payment_tx?: string;
+  preorder_payment_timestamp?: string; // timestamp with time zone
+  tax_payment_timestamp?: string; // timestamp with time zone
 }
 export interface OrderSB {
   created_at?: Date; // timestamp with time zone

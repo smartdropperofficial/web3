@@ -130,7 +130,6 @@ router.post(
 router.post(
   "/verify-single-pre-order-payment-stablecoin",
   ensureToken,
-  validatePaymentFields,
   async (req, res) => {
     try {
       console.log(
@@ -138,27 +137,37 @@ router.post(
       );
       console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
-      const { payment_tx, price, created_at, basket_id } = req.body;
+      const {
+        pre_order_payment_tx,
+        basket_price,
+        preorder_payment_timestamp,
+        basket_id,
+      } = req.body;
 
-      if (!payment_tx || !price || !created_at || !basket_id) {
+      if (
+        !pre_order_payment_tx ||
+        !basket_price ||
+        !preorder_payment_timestamp ||
+        !basket_id
+      ) {
         console.error("❌ [ERROR] Missing required fields:", {
-          payment_tx,
-          price,
-          created_at,
+          pre_order_payment_tx,
+          basket_price,
+          preorder_payment_timestamp,
           basket_id,
         });
         return res.status(400).json({ error: "Missing required fields" });
       }
 
       console.log(
-        `[INFO] Starting transaction monitoring for payment_tx: ${payment_tx}, price: ${price}, created_at: ${created_at}, basket_id: ${basket_id}`
+        `[INFO] Starting transaction monitoring for payment_tx: ${pre_order_payment_tx}, price: ${basket_price}, created_at: ${preorder_payment_timestamp}, basket_id: ${basket_id}`
       );
 
       await monitorTransaction(
-        payment_tx,
-        parseFloat(price),
+        pre_order_payment_tx,
+        parseFloat(basket_price),
         "pre_order_wallet",
-        created_at,
+        preorder_payment_timestamp,
         "orders",
         "status",
         OrderStatus.AWAITING_TAX,
@@ -166,7 +175,7 @@ router.post(
       );
 
       console.log(
-        `[INFO] Transaction monitoring completed for payment_tx: ${payment_tx}. Proceeding to create single preorder for basket_id: ${basket_id}`
+        `[INFO] Transaction monitoring completed for payment_tx: ${pre_order_payment_tx}. Proceeding to create single preorder for basket_id: ${basket_id}`
       );
 
       await createSinglePreorder(basket_id);
@@ -205,25 +214,31 @@ router.post(
       console.log(`${fn} 📥 [REQUEST RECEIVED] Full request body:`, req.body);
 
       const {
-        pre_order_payment_tx: payment_tx,
-        pre_order_amount: price,
-        modified_at: created_at,
+        pre_order_payment_tx,
+        pre_order_amount,
+        preorder_payment_timestamp,
         order_id,
         basket_ids,
       } = req.body;
       console.log(`${fn} [INFO] Extracted fields:`, {
-        payment_tx,
-        price,
-        created_at,
+        pre_order_payment_tx,
+        pre_order_amount,
+        preorder_payment_timestamp,
         order_id,
         basket_ids,
       });
 
-      if (!payment_tx || !price || !created_at || !order_id || !basket_ids) {
+      if (
+        !pre_order_payment_tx ||
+        !pre_order_amount ||
+        !preorder_payment_timestamp ||
+        !order_id ||
+        !basket_ids
+      ) {
         console.error(`${fn} ❌ [ERROR] Missing required fields:`, {
-          payment_tx,
-          price,
-          created_at,
+          pre_order_payment_tx,
+          pre_order_amount,
+          preorder_payment_timestamp,
           order_id,
           basket_ids,
         });
@@ -231,30 +246,32 @@ router.post(
       }
 
       console.log(
-        `${fn} [INFO] Starting transaction monitoring for payment_tx: ${payment_tx}, price: ${price}, created_at: ${created_at}, order_id: ${order_id}, basket_ids: ${JSON.stringify(
+        `${fn} [INFO] Starting transaction monitoring for payment_tx: ${pre_order_payment_tx}, price: ${pre_order_amount}, created_at: ${preorder_payment_timestamp}, order_id: ${order_id}, basket_ids: ${JSON.stringify(
           basket_ids
         )}`
       );
 
       await monitorTransaction(
-        payment_tx,
-        parseFloat(price),
+        pre_order_payment_tx,
+        parseFloat(pre_order_amount),
         "pre_order_wallet",
-        created_at,
+        preorder_payment_timestamp,
         "order",
         "status",
         OrderStatus.PREORDER_PAYMENT_CONFIRMED,
         "pre_order_payment_tx"
       );
       await updateTableStatus(
-        payment_tx,
+        pre_order_payment_tx,
         "order",
         "status",
         OrderStatus.PREORDER_PAYMENT_CONFIRMED,
-        "pre_order_payment_tx"
+        "pre_order_payment_tx",
+        "preorder_payment_timestamp",
+        preorder_payment_timestamp
       );
       console.log(
-        `${fn} [INFO] Transaction monitoring completed for payment_tx: ${payment_tx}. Proceeding to create multi preorders for order_id: ${order_id}, basket_ids: ${JSON.stringify(
+        `${fn} [INFO] Transaction monitoring completed for payment_tx: ${pre_order_payment_tx}. Proceeding to create multi preorders for order_id: ${order_id}, basket_ids: ${JSON.stringify(
           basket_ids
         )}`
       );
@@ -284,59 +301,57 @@ router.post(
     }
   }
 );
-router.post(
-  "/verify-tax-payment-stablecoin",
-  ensureToken,
-  validatePaymentFields,
-  async (req, res) => {
-    try {
-      console.log(
-        "📥 [REQUEST RECEIVED] for endpoint: /verify-tax-order-payment "
-      );
-      console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
+router.post("/verify-tax-payment-stablecoin", ensureToken, async (req, res) => {
+  try {
+    console.log(
+      "📥 [REQUEST RECEIVED] for endpoint: /verify-tax-order-payment "
+    );
+    console.log("📥 [REQUEST RECEIVED] Full request body:", req.body);
 
-      const { payment_tx, price, created_at } = req.body;
+    const { tax_order_payment_tx, tax_order_amount, tax_payment_timestamp } =
+      req.body;
 
-      if (!payment_tx || !price || !created_at) {
-        console.error("❌ [ERROR] Missing required fields:", {
-          payment_tx,
-          price,
-          created_at,
-        });
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      const context = await monitorTransaction(
-        payment_tx,
-        parseFloat(price),
-        "tax_wallet",
-        created_at,
-        "orders",
-        "status",
-        OrderStatus.ORDER_CONFIRMED,
-        "tax_order_payment_tx"
-      );
-      await updateTableStatus(
-        context.txHash,
-        context.table,
-        context.statusColumn,
-        context.newStatus,
-        context.identifierColumn
-      );
-      return res.status(200).json({
-        success: true,
-        message: "Transaction monitored successfully!",
+    if (!tax_order_payment_tx || !tax_order_amount || !tax_payment_timestamp) {
+      console.error("❌ [ERROR] Missing required fields:", {
+        tax_order_payment_tx,
+        tax_order_amount,
+        tax_payment_timestamp,
       });
-    } catch (error: any) {
-      console.error("❌ [ERROR]:", error);
-
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return res.status(400).json({ error: "Missing required fields" });
     }
+
+    const context = await monitorTransaction(
+      tax_order_payment_tx,
+      parseFloat(tax_order_amount),
+      "tax_wallet",
+      tax_payment_timestamp,
+      "orders",
+      "status",
+      OrderStatus.ORDER_CONFIRMED,
+      "tax_order_payment_tx"
+    );
+    await updateTableStatus(
+      context.txHash,
+      context.table,
+      context.statusColumn,
+      context.newStatus,
+      context.identifierColumn,
+      "tax_payment_timestamp",
+      tax_payment_timestamp
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Transaction monitored successfully!",
+    });
+  } catch (error: any) {
+    console.error("❌ [ERROR]:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
   }
-);
+});
 router.post("/create-multi-pre-orders", ensureToken, async (req, res) => {
   try {
     console.log("📥 [REQUEST RECEIVED] for endpoint: /create-pre-orders ");

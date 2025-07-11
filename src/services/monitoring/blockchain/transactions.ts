@@ -33,15 +33,22 @@ export async function updateTableStatus(
   table: string,
   statusColumn: string,
   newStatus: string,
-  identifierColumn: string
+  identifierColumn: string,
+  timestampColumn?: string,
+  timestampValue?: string
 ) {
   console.log(
     `🔄 Attempting to update ${table}.${statusColumn} for column ${statusColumn} with value ${txHash}...`
   );
 
+  const updateFields: Record<string, any> = { [statusColumn]: newStatus };
+  if (timestampColumn && timestampValue) {
+    updateFields[timestampColumn] = timestampValue;
+  }
+
   const { data, error } = await supabase
     .from(table)
-    .update({ [statusColumn]: newStatus })
+    .update(updateFields)
     .eq(identifierColumn, txHash)
     .select()
     .single();

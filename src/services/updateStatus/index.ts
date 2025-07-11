@@ -409,6 +409,12 @@ export const generatePreOrderObject = (basket?: any): OrdersSB | null => {
     );
     return null;
   }
+  if (!basket?.preorder_payment_timestamp) {
+    Logger.error(
+      "generatePreOrderObject: basket.preorder_payment_timestamp is missing"
+    );
+    return null;
+  }
   if (!basket?.basket_price) {
     Logger.error("generatePreOrderObject: basket.basket_price is missing");
     return null;
@@ -451,6 +457,7 @@ export const generatePreOrderObject = (basket?: any): OrdersSB | null => {
       currency: "USD",
       retailer: basket.retailer,
       pre_order_payment_tx: basket.pre_order_payment_tx,
+      preorder_payment_timestamp: basket.preorder_payment_timestamp,
       shipping_info: {
         first_name: shipping.first_name,
         last_name: shipping.last_name,
